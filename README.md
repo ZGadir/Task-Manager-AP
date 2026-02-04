@@ -1,97 +1,103 @@
---=====================================================
--- Task & Project Manager (Prototype)
--- Final Year Project – IPD Milestone 1
---
--- Student: Gadir Zamanbayov
--- Module: 6COSC023W – Final Year Project
---=====================================================
+Task & Project Manager – Prototype
+Final Year Project (IPD Milestone 1)
 
+Student: Gadir Zamanbayov
+Module: 6COSC023W – Final Year Project
 
---=====================================================
--- PROJECT OVERVIEW
---=====================================================
--- This project is a desktop task and project management
--- application designed to help users stay focused,
--- break down complex work, and maintain motivation.
---
--- Each task or project is treated as a persistent
--- workspace rather than a simple checklist item.
---
--- The system is designed to later integrate an AI
--- assistant that asks questions, generates subtasks,
--- tracks progress, and provides motivation.
+Project Overview
+This project is a desktop task and project management application designed to help users stay focused, break down complex tasks, and track progress over time.
 
+Instead of treating tasks as simple checkboxes, each task or project acts as a persistent workspace. The system is designed to later integrate an AI assistant that asks questions, breaks tasks into subtasks, and supports the user throughout completion.
 
---=====================================================
--- CURRENT PROTOTYPE FEATURES (MILESTONE 1)
---=====================================================
--- ✔ Desktop application (Electron)
--- ✔ Task / Project creation
--- ✔ Left-side workspace list
--- ✔ Central workspace view
--- ✔ Progress tracking per task
--- ✔ Gamification foundations (points & progress)
--- ✔ Responsive UI layout
---
--- ✖ AI assistant (planned, not implemented yet)
--- ✖ Calendar integration (planned, not implemented yet)
+This repository contains the working prototype and initial implementation for IPD Milestone 1.
 
+Current Prototype Features
 
---=====================================================
--- DESIGN PRINCIPLES
---=====================================================
--- - Minimal friction when creating tasks
--- - Tasks are workspaces, not checkboxes
--- - Offline-first desktop experience
--- - Gamification used subtly to boost motivation
--- - AI-driven workflow planned for later milestones
+Desktop application built with Electron
 
+Task and project creation
 
---=====================================================
--- TECHNOLOGY STACK
---=====================================================
--- Electron        -> Desktop application framework
--- React           -> UI structure
--- TypeScript      -> Type safety & maintainability
--- Vite            -> Fast development & builds
--- Custom CSS      -> Responsive layout and styling
+Left-side workspace list
 
+Central task workspace view
 
---=====================================================
--- PROJECT STRUCTURE (KEY FILES)
---=====================================================
--- src/App.tsx     -> Main UI layout & logic
--- src/App.css    -> Application styling
--- electron/main.ts -> Electron main process
--- electron/preload.ts -> Secure preload bridge
---
--- Build outputs (release/, dist-electron/) are ignored
+Progress tracking per task
 
+Gamification foundations (points and progress)
 
---=====================================================
--- RUNNING THE PROTOTYPE
---=====================================================
--- npm install
--- npm run dev
+Responsive UI layout
 
+Not implemented yet (planned for later milestones):
 
---=====================================================
--- FUTURE WORK (NEXT MILESTONES)
---=====================================================
--- - AI assistant integration
--- - Task-scoped AI memory
--- - File-based context analysis (PDFs, code files)
--- - Calendar-aware project scheduling
--- - First-time user tutorial
--- - Persistent user settings & data
+AI assistant logic
 
+Calendar integration
 
---=====================================================
--- SUBMISSION CONTEXT
---=====================================================
--- This repository is submitted as part of:
--- - Prototype code (GitHub)
--- - Video demonstration (5–10 min)
--- - Video presentation (20 min)
---
---=====================================================
+Design Principles
+
+Minimal friction when creating tasks
+
+Tasks are treated as workspaces, not one-click completions
+
+Offline-first desktop application
+
+Subtle gamification to improve motivation
+
+AI-driven workflow planned for future development
+
+Technology Stack
+
+Electron (desktop application framework)
+
+React with TypeScript (UI and logic)
+
+Vite (build tooling)
+
+Custom CSS (layout and styling)
+
+Project Structure (Key Files)
+
+src/App.tsx – Main UI and layout logic
+
+src/App.css – Application styling
+
+electron/main.ts – Electron main process
+
+electron/preload.ts – Secure preload bridge
+
+Build outputs are intentionally ignored from version control.
+
+Running the Prototype
+npm install
+npm run dev
+
+Future Work
+
+AI assistant integration for task breakdown
+
+Task-scoped AI memory
+
+File-based context analysis (PDFs, code files)
+
+Calendar-aware project scheduling
+
+First-time user tutorial
+
+Persistent user data and settings
+
+Submission Context
+This repository is submitted as part of:
+
+Prototype code (GitHub link)
+
+Video demonstration (5–10 minutes)
+
+Video presentation (20 minutes)
+
+If you want, I can also:
+
+tighten this to match marking criteria wording
+
+write the Blackboard submission text
+
+or sanity-check everything before final upload
