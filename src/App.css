@@ -1,0 +1,1005 @@
+/* =========================================================
+   GLOBAL RESET + INVISIBLE SCROLLBARS
+   ========================================================= */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #f6f7fb;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Hide scrollbars globally but keep scrolling */
+* {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* Edge / IE */
+}
+*::-webkit-scrollbar {
+  display: none;                /* Chrome / Safari */
+}
+
+/* =========================================================
+   APP LAYOUT
+   ========================================================= */
+.app {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  overflow: hidden;
+  color: #0f172a;
+}
+
+/* Critical for flex shrink */
+.sidebar,
+.center,
+.assistant {
+  min-width: 0;
+  height: 100%;
+}
+
+/* =========================================================
+   SIDEBAR (LEFT)
+   ========================================================= */
+/* LEFT */
+.sidebar {
+  flex: 0 1 300px;          /* can shrink */
+  min-width: 220px;
+  max-width: 340px;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  /* Ensure header aligns title + button nicely */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #4f46e5;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 700;
+}
+
+.title {
+  font-weight: 800;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 36px;
+  border-radius: 12px;
+  
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  cursor: pointer;
+  color: #4f46e5;
+  
+  padding: 0;        /* ← ADD THIS - removes extra spacing */
+  overflow: hidden;  /* ← ADD THIS - clips anything too big */
+}
+
+.icon-btn svg {      /* ← ADD THIS - controls the icon specifically */
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  background: #e0e7ff;
+}
+
+.sidebar-header .title {
+  flex: 1;
+}
+
+.workspace-list {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workspace-item {
+  text-align: left;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: #fff;
+  cursor: pointer;
+}
+
+.workspace-item:hover {
+  background: #ffffff;
+}
+
+.workspace-item.active {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+
+/* LEFT PANEL – Task / Project item text */
+.workspace-item {
+  color: #0f172a;          /* dark slate */
+  font-weight: 600;
+}
+
+.workspace-item .title {
+  color: #0f172a;          /* ensure title is visible */
+}
+
+/* Workspace item title should always be readable */
+.workspace-item .name {
+  color: #0f172a;          /* dark text */
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+/* If you dim items, don't dim the title into invisibility */
+.workspace-item {
+  color: #0f172a;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.08em;
+}
+
+.tag.task {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.tag.project {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.name {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.progress {
+  margin-top: 10px;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background: #4f46e5;
+}
+
+.sidebar-footer {
+  padding: 14px;
+  border-top: 1px solid #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+}
+
+/* =========================================================
+   CENTER WORKSPACE
+   ========================================================= */
+.center {
+  flex: 1 1 auto;           /* always takes remaining space */
+  min-width: 520px;         /* prevents ugly squish */
+  background: white;
+  overflow-y: auto;
+}
+
+.center-header {
+  padding: 28px 32px;
+  border-bottom: 1px solid #f1f5f9;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.crumbs {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.crumbs span {
+  color: #4f46e5;
+  font-weight: 700;
+}
+
+.center-header h1 {
+  margin: 10px 0 6px;
+  font-size: 34px;
+}
+
+.center-header p {
+  color: #64748b;
+  margin: 0;
+}
+
+.meta {
+  margin-top: 16px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.section {
+  padding: 22px 32px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-title h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.pill {
+  font-size: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.empty-card {
+  padding: 18px;
+  border-radius: 16px;
+  border: 2px dashed #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+/* =========================================================
+   ASSISTANT (RIGHT)
+   ========================================================= */
+.assistant {
+  flex: 0 1 360px;          /* can shrink */
+  min-width: 280px;
+  max-width: 440px;
+  width: clamp(280px, 28vw, 420px);
+  background: #f8fafc;
+  border-left: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.assistant-header {
+  background: white;
+  padding: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.assistant-title {
+  font-weight: 800;
+}
+
+.modes {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.mode {
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  padding: 7px 6px;
+  border-radius: 10px;
+  color: #cbd5e1;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.mode.active {
+  background: #4f46e5;
+  color: white;
+  border-color: #4f46e5;
+}
+
+.assistant-body {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.muted {
+  color: #94a3b8;
+}
+
+.assistant-input {
+  padding: 14px;
+  border-top: 1px solid #e2e8f0;
+  background: white;
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 10px;
+}
+
+.assistant-input input {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.assistant-input button {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Disabled styling without grey blocks */
+.assistant-input input:disabled {
+  background: #ffffff;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.assistant-input button:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+/* =========================================================
+   RESPONSIVE (NO SCROLLBARS ON NARROW WINDOWS)
+   ========================================================= */
+/* Hide assistant only when REALLY needed */
+@media (max-width: 980px) {
+  .assistant { display: none; }
+  .center { min-width: 0; }     /* allow center to shrink when assistant hides */
+}
+
+/* Hide sidebar on very small */
+@media (max-width: 680px) {
+  .sidebar { display: none; }
+}
+
+/* main area holds center + assistant */
+.mainArea{
+  display:flex;
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+}
+
+/* default: assistant on right */
+.assistantBottom{ display:none; }
+
+/* when small: hide right assistant, show bottom assistant */
+@media (max-width: 980px){
+  .mainArea{
+    flex-direction: column;   /* stack vertically */
+  }
+
+  .assistant{ display:none; } /* hide right */
+  .assistantBottom{
+    display:block;
+    flex: 0 0 auto;
+    border-top: 1px solid #e2e8f0; /* optional divider */
+  }
+
+  .center{
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+/* =========================
+   MODAL (Create Task / Project)
+   ========================= */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.2);  /* ← Lighter backdrop */
+  backdrop-filter: blur(2px);          /* ← Less blur */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.08);  /* ← Softer shadow */
+  overflow: hidden;
+  border: 1px solid #e2e8f0;  /* ← Add subtle border */
+}
+
+.modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #f1f5f9;  /* ← Lighter divider */
+}
+
+.modal-header h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 800;  /* ← Bolder to match your app */
+  color: #0f172a;
+}
+
+.modal-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;  /* ← More breathing room */
+}
+
+/* =========================
+   FORM FIELDS
+   ========================= */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;  /* ← Darker label */
+}
+
+.field input,
+.field textarea,
+.field select {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  color: #0f172a;
+  transition: border-color 0.2s;
+}
+
+.field textarea {
+  resize: none;
+  min-height: 80px;     /* ← Change from 100px to 80px */
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  color: #0f172a;
+  transition: border-color 0.2s;
+}
+.field textarea:focus,
+.field select:focus {
+  outline: none;
+  border-color: #4f46e5;  /* ← Your brand color */
+  background: #fafbff;     /* ← Subtle highlight */
+}
+
+/* =========================
+   MODAL ACTIONS / BUTTONS
+   ========================= */
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px 0;
+  border-radius: 12px;  /* ← Match your button radius */
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn.primary {
+  background: #4f46e5;  /* ← Your brand color */
+  color: white;
+}
+
+.btn.primary:hover {
+  background: #4338ca;
+  transform: translateY(-1px);  /* ← Subtle lift */
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+}
+
+.btn.ghost {
+  background: #f8fafc;  /* ← Lighter, matches your assistant panel */
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.btn.ghost:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* =========================
+   LEFT PANEL EMPTY STATE
+   ========================= */
+
+.empty-left {
+  padding: 16px;
+  font-size: 13px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+/* Execution Plan Styles */
+.execution-plan {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.no-subtasks {
+  color: #999;
+  font-size: 14px;
+}
+
+.subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.subtask-item:hover {
+  background: #f0f1f3;
+}
+
+.subtask-item.completed {
+  opacity: 0.6;
+}
+
+.subtask-item.completed .subtask-title {
+  text-decoration: line-through;
+  color: #666;
+}
+
+.subtask-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+.subtask-title {
+  flex: 1;
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.subtask-points {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6366f1;
+}
+
+.add-subtask-container {
+  display: flex;
+  gap: 8px;
+}
+
+.add-subtask-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #000; /* make input text black */
+}
+
+.add-subtask-input:focus {
+  border-color: #6366f1;
+}
+
+.add-subtask-input::placeholder {
+  color: #999;
+}
+
+.add-subtask-btn {
+  padding: 10px 20px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.add-subtask-btn:hover {
+  background: #5558e3;
+}
+
+.add-subtask-btn:active {
+  transform: scale(0.98);
+}
+
+/* Progress Bar */
+.progress-container {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  position: absolute;
+  right: 0;
+  top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6366f1;
+}
+
+/* Task Finished Button */
+.task-finished-btn {
+  width: 100%;
+  padding: 14px 20px;
+  margin-top: 16px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.task-finished-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.task-finished-btn:active {
+  transform: translateY(0);
+}
+
+.task-finished-btn:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.task-finished-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Better outlined workspace items */
+.workspace-item {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.workspace-item:hover {
+  background: #f9fafb;
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+}
+
+.workspace-item.selected {
+  background: #f0f1ff;
+  border-color: #6366f1;
+  border-left: 4px solid #6366f1;
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.15);
+}
+
+.workspace-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-type {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6366f1;
+  letter-spacing: 0.5px;
+}
+
+.workspace-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.workspace-progress-bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.workspace-progress-fill {
+  height: 100%;
+  background: #6366f1;
+  transition: width 0.3s ease;
+}
+/* Workspace stats row */
+.workspace-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.workspace-points {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.workspace-progress-text {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* Progress bar for all items */
+.workspace-progress-bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.workspace-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 999px;
+}
+
+/* Task theme - Purple */
+.workspace-item.task {
+  border-left-color: #6366f1;
+}
+
+.workspace-item.task.selected {
+  background: #f0f1ff;
+  border-color: #6366f1;
+}
+
+.workspace-item.task .workspace-type {
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.workspace-item.task .workspace-progress-fill {
+  background: #6366f1;
+}
+
+/* Project theme - Orange */
+.workspace-item.project {
+  border-left-color: #f97316;
+}
+
+.workspace-item.project.selected {
+  background: #fff7ed;
+  border-color: #f97316;
+}
+
+.workspace-item.project .workspace-type {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.workspace-item.project .workspace-progress-fill {
+  background: #f97316;
+}
+
+/* Better Add Subtask Input */
+.add-subtask-container {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 2px dashed #e5e7eb;
+}
+
+.add-subtask-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: white;
+  color: #000; /* make input text black */
+}
+
+.add-subtask-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.add-subtask-btn {
+  padding: 12px 24px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.add-subtask-btn:hover {
+  background: #5558e3;
+  transform: translateY(-1px);
+}
+
+/* Notification Toast */
+.notification-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
+  animation: slideInRight 0.3s ease, fadeOut 0.5s ease 2.5s forwards;
+  z-index: 1000;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Overall points display */
+.overall-points {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  margin: 12px 16px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.points-icon {
+  font-size: 24px;
+}
+
+.points-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: white;
+  line-height: 1;
+}
+
+.points-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  margin-left: auto;
+}
