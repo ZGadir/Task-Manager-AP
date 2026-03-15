@@ -635,6 +635,39 @@ html, body, #root {
   color: #666;
 }
 
+.subtask-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: all 0.2s;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.subtask-item:hover .subtask-delete-btn {
+  opacity: 1;
+}
+
+.subtask-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.dark .subtask-delete-btn {
+  color: #475569;
+}
+
+.dark .subtask-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
 .subtask-checkbox {
   width: 18px;
   height: 18px;
@@ -975,6 +1008,180 @@ html, body, #root {
   border-left-color: #6366f1;
 }
 
+/* =========================================================
+   ARCHIVED SECTION
+   ========================================================= */
+.archived-section {
+  border-top: 1px solid #f1f5f9;
+  padding: 8px 10px;
+}
+
+/* =========================================================
+   RECENTLY DELETED
+   ========================================================= */
+.recently-deleted {
+  margin-top: 8px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+
+.recently-deleted-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 6px 4px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.recently-deleted-toggle:hover {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.recently-deleted-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recently-deleted-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+}
+
+.recently-deleted-title {
+  font-size: 13px;
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.restore-btn {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6366f1;
+  background: #eef2ff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.restore-btn:hover {
+  background: #e0e7ff;
+}
+
+/* Dark mode */
+.dark .recently-deleted {
+  border-color: #334155;
+}
+
+.dark .recently-deleted-toggle {
+  color: #475569;
+}
+
+.dark .recently-deleted-toggle:hover {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.dark .recently-deleted-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .restore-btn {
+  background: #1e1b4b;
+  color: #a5b4fc;
+}
+
+.dark .restore-btn:hover {
+  background: #312e81;
+}
+
+.archived-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+
+.archived-toggle:hover {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.archived-chevron {
+  margin-left: auto;
+  font-size: 10px;
+}
+
+.archived-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.workspace-item.archived {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.workspace-item.archived:hover {
+  opacity: 0.8;
+}
+
+/* Dark mode */
+.dark .archived-section {
+  border-color: #334155;
+}
+
+.dark .archived-toggle {
+  color: #475569;
+}
+
+.dark .archived-toggle:hover {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.archived-badge {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 8px;
+}
+
+.dark .archived-badge {
+  background: #334155;
+  color: #64748b;
+}
+
 .workspace-item.task.selected {
   background: #f0f1ff;
   border-color: #6366f1;
@@ -1063,8 +1270,8 @@ html, body, #root {
 /* Notification Toast */
 .notification-toast {
   position: fixed;
-  top: 24px;
-  right: 24px;
+  top: 20px;
+  right: 20px;
   padding: 16px 24px;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
@@ -1073,7 +1280,37 @@ html, body, #root {
   font-weight: 600;
   box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
   animation: slideInRight 0.3s ease, fadeOut 0.5s ease 2.5s forwards;
-  z-index: 1000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+}
+
+.dark .notification-toast {
+  background: linear-gradient(135deg, #c2410c 0%, #f97316 100%);
+  box-shadow: 0 10px 40px rgba(249, 115, 22, 0.4);
+  color: white;
+}
+
+
+.toast-fire {
+  font-size: 20px;
+  animation: fireFlicker 0.5s ease-in-out infinite alternate;
+  margin-right: 6px;
+}
+
+@keyframes fireFlicker {
+  0% {
+    transform: scale(1) rotate(-5deg);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.15) rotate(3deg);
+    filter: brightness(1.2);
+  }
+  100% {
+    transform: scale(1.05) rotate(-3deg);
+    filter: brightness(0.9);
+  }
 }
 
 @keyframes slideInRight {

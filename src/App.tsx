@@ -9,7 +9,7 @@
 import { useState, useEffect, type MouseEvent } from 'react'
 import './App.css'
 import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2 } from 'lucide-react'
-import { Workspace, Subtask, AssistantState } from './types'
+import { Workspace, Subtask } from './types'
 
 function DiamondIcon({ size = 16, color = 'currentColor' }: { size?: number, color?: string }) {
   return (
@@ -85,6 +85,19 @@ export default function App() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
+  const [recentlyDeleted, setRecentlyDeleted] = useState<{
+    subtask: Subtask
+    workspaceId: number
+    timestamp: number
+  }[]>([])
+  const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false)
+  const [archivedWorkspaces, setArchivedWorkspaces] = useState<Workspace[]>(() => {
+    const saved = localStorage.getItem('archivedWorkspaces')
+    if (saved) return JSON.parse(saved)
+    return []
+  })
+  const [showArchived, setShowArchived] = useState(false)
+  const [showArchiveModal, setShowArchiveModal] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('darkMode') === 'true'
@@ -103,8 +116,15 @@ export default function App() {
     localStorage.setItem('workspaces', JSON.stringify(workspaces))
   }, [workspaces])
 
+  useEffect(() => {
+    localStorage.setItem('archivedWorkspaces', JSON.stringify(archivedWorkspaces))
+  }, [archivedWorkspaces])
+
   // Get current workspace
-  const currentWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
+  const currentWorkspace =
+    workspaces.find(w => w.id === selectedWorkspaceId) ||
+    archivedWorkspaces.find(w => w.id === selectedWorkspaceId);
+  const isArchived = archivedWorkspaces.some(w => w.id === selectedWorkspaceId);
 
   // Calculate total points across all workspaces
   const totalOverallPoints = workspaces.reduce((sum, w) => sum + w.points, 0);
@@ -148,6 +168,36 @@ export default function App() {
     setNewSubtaskTitle("");
   };
 
+  const handleDeleteSubtask = (subtaskId: number) => {
+    if (!currentWorkspace) return
+
+    const subtask = currentWorkspace.subtasks.find(s => s.id === subtaskId)
+    if (!subtask) return
+
+    setRecentlyDeleted(prev => {
+      const updated = [
+        { subtask, workspaceId: selectedWorkspaceId, timestamp: Date.now() },
+        ...prev
+      ]
+      return updated.slice(0, 10)
+    })
+
+    const updatedSubtasks = currentWorkspace.subtasks.filter(s => s.id !== subtaskId)
+    updateWorkspace(selectedWorkspaceId, { subtasks: updatedSubtasks })
+  }
+
+  const handleRestoreSubtask = (index: number) => {
+    const item = recentlyDeleted[index]
+    if (!item) return
+
+    const workspace = workspaces.find(w => w.id === item.workspaceId)
+    if (!workspace) return
+
+    const updatedSubtasks = [...workspace.subtasks, item.subtask]
+    updateWorkspace(item.workspaceId, { subtasks: updatedSubtasks })
+    setRecentlyDeleted(prev => prev.filter((_, i) => i !== index))
+  }
+
   const handleToggleSubtask = (subtaskId: number) => {
     if (!currentWorkspace) return;
 
@@ -180,7 +230,7 @@ export default function App() {
           // Check for streak
           if (completedCount > 0 && completedCount % 3 === 0) {
             setTimeout(() => {
-              showNotification(`🔥 You're on a streak! +100 bonus points`);
+              showNotification(` You're on a streak! +100 bonus points`);
               setWorkspaces(prev => prev.map(w => 
                 w.id === selectedWorkspaceId 
                   ? { ...w, points: w.points + 100 }
@@ -213,7 +263,33 @@ export default function App() {
     });
     
     showNotification(`🎉 Task completed! You earned ${totalSubtaskPoints} points!`);
+    setShowArchiveModal(true);
   };
+
+  const handleArchiveWorkspace = (workspaceId: number) => {
+    const workspace = workspaces.find(w => w.id === workspaceId)
+    if (!workspace) return
+
+    setArchivedWorkspaces(prev => [workspace, ...prev])
+    const remaining = workspaces.filter(w => w.id !== workspaceId)
+    setWorkspaces(remaining)
+
+    if (remaining.length > 0) {
+      setSelectedWorkspaceId(remaining[0].id)
+    }
+
+    setShowArchiveModal(false)
+    setOpenMenuId(null)
+  }
+
+  const handleUnarchiveWorkspace = (workspaceId: number) => {
+    const workspace = archivedWorkspaces.find(w => w.id === workspaceId)
+    if (!workspace) return
+
+    setWorkspaces(prev => [workspace, ...prev])
+    setArchivedWorkspaces(prev => prev.filter(w => w.id !== workspaceId))
+    setSelectedWorkspaceId(workspaceId)
+  }
 
   const handleDeleteWorkspace = (e: MouseEvent<HTMLButtonElement>, workspaceId: number) => {
     e.stopPropagation();
@@ -330,6 +406,7 @@ export default function App() {
                       className="workspace-dropdown-item"
                       onClick={(e) => {
                         e.stopPropagation()
+                        handleArchiveWorkspace(workspace.id)
                         setOpenMenuId(null)
                       }}
                     >
@@ -365,6 +442,55 @@ export default function App() {
           ))}
         </div>
 
+        {/* ARCHIVED SECTION */}
+        <div className="archived-section">
+          <button
+            className="archived-toggle"
+            onClick={() => setShowArchived(!showArchived)}
+          >
+            <Archive size={14} />
+            Archived ({archivedWorkspaces.length})
+            <span className="archived-chevron">{showArchived ? '▲' : '▼'}</span>
+          </button>
+
+          {showArchived && (
+            <div className="archived-list">
+              {archivedWorkspaces.length === 0 && (
+                <div className="empty-left">No archived tasks</div>
+              )}
+              {archivedWorkspaces.map(workspace => (
+                <div
+                  key={workspace.id}
+                  className={`workspace-item archived ${selectedWorkspaceId === workspace.id ? 'selected' : ''}`}
+                  onClick={() => handleSelectWorkspace(workspace.id)}
+                >
+                  <div className="workspace-header">
+                    <span className="workspace-type">{workspace.type.toUpperCase()}</span>
+                    <button
+                      className="workspace-menu-btn"
+                      style={{ opacity: 1 }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleUnarchiveWorkspace(workspace.id)
+                      }}
+                      title="Unarchive"
+                    >
+                      <Archive size={14} />
+                    </button>
+                  </div>
+                  <span className="workspace-title">{workspace.title}</span>
+                  <div className="workspace-stats">
+                    <span className="workspace-points">
+                      <DiamondIcon size={11} color="#94a3b8" /> {workspace.points} pts
+                    </span>
+                    <span className="workspace-progress-text">100%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="sidebar-footer">
           <div className="muted">Local Only Mode</div>
         </div>
@@ -381,6 +507,7 @@ export default function App() {
               <div className="crumbs">
                 {currentWorkspace.type === 'task' ? 'Daily Task' : 'Project'}{' '}
                 <span>›</span> <span>Workspace</span>
+                {isArchived && <span className="archived-badge">Archived</span>}
               </div>
 
               <h1>{currentWorkspace.title}</h1>
@@ -445,6 +572,16 @@ export default function App() {
                       <span className="subtask-points">
                         <DiamondIcon size={11} color="#6366f1" /> +{subtask.points} pts
                       </span>
+                      <button
+                        className="subtask-delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSubtask(subtask.id)
+                        }}
+                        title="Delete subtask"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -470,10 +607,40 @@ export default function App() {
                 <button
                   onClick={handleFinishTask}
                   className="task-finished-btn"
-                  disabled={calculateProgress(currentWorkspace) === 100}
+                  disabled={calculateProgress(currentWorkspace) === 100 || isArchived}
                 >
                   {calculateProgress(currentWorkspace) === 100 ? '✓ Task Completed' : '✓ Mark Task as Finished'}
                 </button>
+
+                {/* Recently Deleted */}
+                {recentlyDeleted.length > 0 && (
+                  <div className="recently-deleted">
+                    <button
+                      className="recently-deleted-toggle"
+                      onClick={() => setShowRecentlyDeleted(!showRecentlyDeleted)}
+                    >
+                      <Trash2 size={13} />
+                      Recently Deleted ({recentlyDeleted.length})
+                      <span className="archived-chevron">{showRecentlyDeleted ? '▲' : '▼'}</span>
+                    </button>
+
+                    {showRecentlyDeleted && (
+                      <div className="recently-deleted-list">
+                        {recentlyDeleted.map((item, index) => (
+                          <div key={index} className="recently-deleted-item">
+                            <span className="recently-deleted-title">{item.subtask.title}</span>
+                            <button
+                              className="restore-btn"
+                              onClick={() => handleRestoreSubtask(index)}
+                            >
+                              Restore
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Activity Log */}
                 <div className="activity-log">
@@ -527,6 +694,34 @@ export default function App() {
           <button disabled>→</button>
         </div>
       </aside>
+
+      {/* ARCHIVE MODAL */}
+      {showArchiveModal && (
+        <div className="modal-backdrop" onMouseDown={() => setShowArchiveModal(false)}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>🎉 Task Completed!</h3>
+              <p>Would you like to move this task to the archive?</p>
+            </div>
+            <div className="modal-body">
+              <div className="modal-actions">
+                <button
+                  className="btn ghost"
+                  onClick={() => setShowArchiveModal(false)}
+                >
+                  Keep Active
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={() => handleArchiveWorkspace(selectedWorkspaceId)}
+                >
+                  Move to Archive
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =======================================================
           CREATE MODAL (Add Task/Project)
@@ -589,6 +784,7 @@ export default function App() {
       {/* Notification Toast */}
       {notification.show && (
         <div className="notification-toast">
+          <span className="toast-fire">🔥</span>
           {notification.message}
         </div>
       )}
