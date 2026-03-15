@@ -8,119 +8,10 @@
 
 import { useState, useEffect, type MouseEvent } from 'react'
 import './App.css'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2 } from 'lucide-react'
-import { Workspace, Subtask } from './types'
-
-function SortableWorkspaceItem({
-  workspace,
-  isSelected,
-  openMenuId,
-  onSelect,
-  onMenuToggle,
-  onArchive,
-  onDelete,
-  isDarkMode
-}: {
-  workspace: Workspace
-  isSelected: boolean
-  openMenuId: number | null
-  onSelect: (id: number) => void
-  onMenuToggle: (e: React.MouseEvent, id: number) => void
-  onArchive: (id: number) => void
-  onDelete: (e: React.MouseEvent<HTMLButtonElement>, id: number) => void
-  isDarkMode: boolean
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: workspace.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    cursor: 'grab'
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`workspace-item ${workspace.type} ${isSelected ? 'selected' : ''}`}
-      onClick={() => onSelect(workspace.id)}
-    >
-      <div className="workspace-header">
-        <span className="workspace-type">{workspace.type.toUpperCase()}</span>
-        <button
-          className="workspace-menu-btn"
-          onClick={(e) => onMenuToggle(e, workspace.id)}
-          title="Workspace actions"
-        >
-          <MoreHorizontal size={15} />
-        </button>
-
-        {openMenuId === workspace.id && (
-          <div className="workspace-dropdown">
-            <button
-              className="workspace-dropdown-item"
-              onClick={(e) => {
-                e.stopPropagation()
-                onArchive(workspace.id)
-              }}
-            >
-              <Archive size={14} /> Archive
-            </button>
-            <button
-              className="workspace-dropdown-item delete"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(e, workspace.id)
-              }}
-            >
-              <Trash2 size={14} /> Delete
-            </button>
-          </div>
-        )}
-      </div>
-      <span className="workspace-title">{workspace.title}</span>
-      <div className="workspace-stats">
-        <span className="workspace-points">
-          <DiamondIcon size={11} color={isDarkMode ? '#f97316' : '#6366f1'} /> {workspace.points} pts
-        </span>
-        <span className="workspace-progress-text">{workspace.progress}%</span>
-      </div>
-      <div className="workspace-progress-bar">
-        <div
-          className="workspace-progress-fill"
-          style={{ width: `${workspace.progress}%` }}
-        />
-      </div>
-    </div>
-  )
-}
+import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp } from 'lucide-react'
+import { Workspace, Subtask, AssistantMessage } from './types'
+import { checkOllamaRunning, generateSubtasks } from './aiService'
+import { extractDocumentText, truncateDocument } from './documentParser'
 
 function DiamondIcon({ size = 16, color = 'currentColor' }: { size?: number, color?: string }) {
   return (
@@ -196,12 +87,13 @@ export default function App() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
-  const [recentlyDeleted, setRecentlyDeleted] = useState<{
-    subtask: Subtask
-    workspaceId: number
-    timestamp: number
-  }[]>([])
-  const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false)
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([])
+  const [assistantInput, setAssistantInput] = useState('')
+  const [assistantMode, setAssistantMode] = useState<'questioning' | 'planning' | 'execution' | 'review'>('questioning')
+  const [isAILoading, setIsAILoading] = useState(false)
+  const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
+  const [uploadedDocument, setUploadedDocument] = useState<string>('')
+  const [uploadedFileName, setUploadedFileName] = useState<string>('')
   const [archivedWorkspaces, setArchivedWorkspaces] = useState<Workspace[]>(() => {
     const saved = localStorage.getItem('archivedWorkspaces')
     if (saved) return JSON.parse(saved)
@@ -230,6 +122,23 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('archivedWorkspaces', JSON.stringify(archivedWorkspaces))
   }, [archivedWorkspaces])
+
+  useEffect(() => {
+    checkOllamaRunning().then(running => {
+      setOllamaRunning(running)
+      if (running) {
+        setAssistantMessages([{
+          role: 'assistant',
+          content: `Hi! I'm your TaskQuest AI assistant.\n\nI can help you break down any task into clear subtasks.\n\nTo get started:\n1. Select or create a task on the left\n2. Tell me about it and I'll ask a few questions\n3. Then I'll generate your subtasks automatically\n\nYou can also upload a PDF or Word document and I'll use it to create relevant subtasks.`
+        }])
+      } else {
+        setAssistantMessages([{
+          role: 'assistant',
+          content: `⚠️ Ollama is not running.\n\nTo use the AI assistant:\n1. Open a terminal\n2. Run: ollama run qwen2.5:7b\n3. Come back and refresh the app`
+        }])
+      }
+    })
+  }, [])
 
   // Get current workspace
   const currentWorkspace =
@@ -278,36 +187,6 @@ export default function App() {
     updateWorkspace(selectedWorkspaceId, { subtasks: updatedSubtasks });
     setNewSubtaskTitle("");
   };
-
-  const handleDeleteSubtask = (subtaskId: number) => {
-    if (!currentWorkspace) return
-
-    const subtask = currentWorkspace.subtasks.find(s => s.id === subtaskId)
-    if (!subtask) return
-
-    setRecentlyDeleted(prev => {
-      const updated = [
-        { subtask, workspaceId: selectedWorkspaceId, timestamp: Date.now() },
-        ...prev
-      ]
-      return updated.slice(0, 10)
-    })
-
-    const updatedSubtasks = currentWorkspace.subtasks.filter(s => s.id !== subtaskId)
-    updateWorkspace(selectedWorkspaceId, { subtasks: updatedSubtasks })
-  }
-
-  const handleRestoreSubtask = (index: number) => {
-    const item = recentlyDeleted[index]
-    if (!item) return
-
-    const workspace = workspaces.find(w => w.id === item.workspaceId)
-    if (!workspace) return
-
-    const updatedSubtasks = [...workspace.subtasks, item.subtask]
-    updateWorkspace(item.workspaceId, { subtasks: updatedSubtasks })
-    setRecentlyDeleted(prev => prev.filter((_, i) => i !== index))
-  }
 
   const handleToggleSubtask = (subtaskId: number) => {
     if (!currentWorkspace) return;
@@ -402,28 +281,6 @@ export default function App() {
     setSelectedWorkspaceId(workspaceId)
   }
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8
-      }
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates
-    })
-  )
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    setWorkspaces(items => {
-      const oldIndex = items.findIndex(w => w.id === active.id)
-      const newIndex = items.findIndex(w => w.id === over.id)
-      return arrayMove(items, oldIndex, newIndex)
-    })
-  }
-
   const handleDeleteWorkspace = (e: MouseEvent<HTMLButtonElement>, workspaceId: number) => {
     e.stopPropagation();
     if (workspaces.length === 1) return;
@@ -433,6 +290,119 @@ export default function App() {
       setSelectedWorkspaceId(remaining[0].id);
     }
   };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setIsAILoading(true)
+      const text = await extractDocumentText(file)
+      const truncated = truncateDocument(text)
+      setUploadedDocument(truncated)
+      setUploadedFileName(file.name)
+      setAssistantMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `📄 I've read "${file.name}" successfully!\n\nI'll use this document to generate relevant subtasks for your task. Just tell me which task you want to work on or describe what you need to do.`
+      }])
+    } catch (error) {
+      setAssistantMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ Sorry, I couldn't read that file. Please make sure it's a PDF or Word document.`
+      }])
+    } finally {
+      setIsAILoading(false)
+    }
+  }
+
+  const handleAssistantSend = async () => {
+    if (!assistantInput.trim() || isAILoading) return
+    if (!currentWorkspace) {
+      setAssistantMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Please select or create a task first, then I can help you break it down!'
+      }])
+      setAssistantInput('')
+      return
+    }
+
+    const userMessage = assistantInput.trim()
+    setAssistantInput('')
+    setAssistantMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setIsAILoading(true)
+
+    try {
+      if (assistantMode === 'questioning') {
+        const conversationHistory = assistantMessages.map(m => ({
+          role: m.role as 'user' | 'assistant' | 'system',
+          content: m.content
+        }))
+
+        // Free chat — send full conversation history
+        const { sendToAI } = await import('./aiService')
+
+        const systemPrompt = {
+          role: 'system' as const,
+          content: `You are TaskQuest AI assistant — a helpful, friendly assistant that helps users plan and break down tasks. 
+You can have normal conversations but always try to guide the user towards breaking down their current task.
+Current task: ${currentWorkspace?.title || 'None selected'}
+Description: ${currentWorkspace?.description || 'None'}`
+        }
+
+        const messages = [
+          systemPrompt,
+          ...conversationHistory,
+          { role: 'user' as const, content: userMessage }
+        ]
+
+        const response = await sendToAI(messages)
+
+        setAssistantMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response
+        }])
+      } else if (assistantMode === 'planning') {
+        setAssistantMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⏳ Analysing your task and generating subtasks...'
+        }])
+
+        const result = await generateSubtasks(
+          currentWorkspace.title,
+          userMessage,
+          uploadedDocument || undefined
+        )
+
+        const newSubtasks: Subtask[] = result.subtasks.map((title, index) => ({
+          id: Date.now() + index,
+          title,
+          done: false,
+          points: 100
+        }))
+
+        updateWorkspace(currentWorkspace.id, {
+          subtasks: [...currentWorkspace.subtasks, ...newSubtasks]
+        })
+
+        setAssistantMessages(prev => [
+          ...prev.slice(0, -1),
+          {
+            role: 'assistant',
+            content: `✅ I've generated ${result.subtasks.length} subtasks for you!\n\n**Why these subtasks?**\n${result.reasoning}\n\nYou can see them in the Execution Plan. Good luck! 🚀`
+          }
+        ])
+
+        setAssistantMode('execution')
+      }
+    } catch (error) {
+      setAssistantMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '❌ Something went wrong. Make sure Ollama is running and try again.'
+      }])
+    } finally {
+      setIsAILoading(false)
+    }
+  }
 
   const handleSelectWorkspace = (workspaceId: number) => {
     setSelectedWorkspaceId(workspaceId);
@@ -502,41 +472,77 @@ export default function App() {
 
         {/* Overall points display */}
         <div className="overall-points">
-          <DiamondIcon size={28} color="white" />
+          <DiamondIcon size={28} color={isDarkMode ? '#a855f7' : '#f97316'} />
           <span className="points-value">{totalOverallPoints}</span>
           <span className="points-label">Total Points</span>
         </div>
 
         <div className="workspace-list">
+          {/* Empty state */}
           {workspaces.length === 0 && <div className="empty-left">No tasks yet</div>}
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={workspaces.map(w => w.id)}
-              strategy={verticalListSortingStrategy}
+          {/* List is NOT hard-coded; it comes from state */}
+
+
+          {workspaces.map((workspace) => (
+            <div 
+              key={workspace.id}
+              className={`workspace-item ${workspace.type} ${selectedWorkspaceId === workspace.id ? 'selected' : ''}`}
+              onClick={() => handleSelectWorkspace(workspace.id as number)}
             >
-              {workspaces.map(workspace => (
-                <SortableWorkspaceItem
-                  key={workspace.id}
-                  workspace={workspace}
-                  isSelected={selectedWorkspaceId === workspace.id}
-                  openMenuId={openMenuId}
-                  onSelect={handleSelectWorkspace}
-                  onMenuToggle={(e, id) => {
+              <div className="workspace-header">
+                <span className="workspace-type">{workspace.type.toUpperCase()}</span>
+                <button
+                  className="workspace-menu-btn"
+                  onClick={(e) => {
                     e.stopPropagation()
-                    setOpenMenuId(openMenuId === id ? null : id)
+                    setOpenMenuId(openMenuId === workspace.id ? null : workspace.id)
                   }}
-                  onArchive={handleArchiveWorkspace}
-                  onDelete={handleDeleteWorkspace}
-                  isDarkMode={isDarkMode}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+                  title="Workspace actions"
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+
+                {openMenuId === workspace.id && (
+                  <div className="workspace-dropdown">
+                    <button
+                      className="workspace-dropdown-item"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleArchiveWorkspace(workspace.id)
+                        setOpenMenuId(null)
+                      }}
+                    >
+                      <Archive size={14} /> Archive
+                    </button>
+                    <button
+                      className="workspace-dropdown-item delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteWorkspace(e as MouseEvent<HTMLButtonElement>, workspace.id)
+                        setOpenMenuId(null)
+                      }}
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+              <span className="workspace-title">{workspace.title}</span>
+              <div className="workspace-stats">
+                <span className="workspace-points">
+                  <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> {workspace.points} pts
+                </span>
+                <span className="workspace-progress-text">{workspace.progress}%</span>
+              </div>
+              <div className="workspace-progress-bar">
+                <div 
+                  className="workspace-progress-fill" 
+                  style={{ width: `${workspace.progress}%` }}
+                ></div>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* ARCHIVED SECTION */}
@@ -614,7 +620,7 @@ export default function App() {
 
               <div className="header-stats">
                 <span className="pts-badge">
-                  <DiamondIcon size={14} color="#f97316" /> {currentWorkspace.points} pts earned
+                  <DiamondIcon size={14} color={isDarkMode ? '#a855f7' : '#f97316'} /> {currentWorkspace.points} pts earned
                 </span>
               </div>
 
@@ -667,18 +673,8 @@ export default function App() {
                       />
                       <span className="subtask-title">{subtask.title}</span>
                       <span className="subtask-points">
-                        <DiamondIcon size={11} color="#6366f1" /> +{subtask.points} pts
+                        <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> +{subtask.points} pts
                       </span>
-                      <button
-                        className="subtask-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteSubtask(subtask.id)
-                        }}
-                        title="Delete subtask"
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -709,36 +705,6 @@ export default function App() {
                   {calculateProgress(currentWorkspace) === 100 ? '✓ Task Completed' : '✓ Mark Task as Finished'}
                 </button>
 
-                {/* Recently Deleted */}
-                {recentlyDeleted.length > 0 && (
-                  <div className="recently-deleted">
-                    <button
-                      className="recently-deleted-toggle"
-                      onClick={() => setShowRecentlyDeleted(!showRecentlyDeleted)}
-                    >
-                      <Trash2 size={13} />
-                      Recently Deleted ({recentlyDeleted.length})
-                      <span className="archived-chevron">{showRecentlyDeleted ? '▲' : '▼'}</span>
-                    </button>
-
-                    {showRecentlyDeleted && (
-                      <div className="recently-deleted-list">
-                        {recentlyDeleted.map((item, index) => (
-                          <div key={index} className="recently-deleted-item">
-                            <span className="recently-deleted-title">{item.subtask.title}</span>
-                            <button
-                              className="restore-btn"
-                              onClick={() => handleRestoreSubtask(index)}
-                            >
-                              Restore
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Activity Log */}
                 <div className="activity-log">
                   <h3>Activity Log</h3>
@@ -758,37 +724,83 @@ export default function App() {
         )}
       </main>
 
-      {/* =======================================================
-          RIGHT PANEL (ASSISTANT): UI only for now (no AI yet)
-          ======================================================= */}
       <aside className="assistant">
         <div className="assistant-header">
           <div className="assistant-title">Task Assistant</div>
-
           <div className="modes">
-            <span className="mode active">QUESTIONING</span>
-            <span className="mode">PLANNING</span>
-            <span className="mode">EXECUTION</span>
-            <span className="mode">REVIEW</span>
+            {(['questioning', 'planning', 'execution', 'review'] as const).map(mode => (
+              <span
+                key={mode}
+                className={`mode ${assistantMode === mode ? 'active' : ''}`}
+                onClick={() => setAssistantMode(mode)}
+                style={{ cursor: 'pointer' }}
+              >
+                {mode.toUpperCase()}
+              </span>
+            ))}
           </div>
         </div>
 
-        <div className="assistant-body">
-          <div className="card">
-            <p>
-              <b>UI only:</b> assistant comes later.
-            </p>
-            <p className="muted">No internet. Uses only your info.</p>
-
-            {/* FUTURE: Put chat messages + file list here */}
-
-            
+        {ollamaRunning === false && (
+          <div className="ollama-warning">
+            ⚠️ Ollama not running
           </div>
+        )}
+
+        <div className="assistant-body" ref={(el) => {
+          if (el) el.scrollTop = el.scrollHeight
+        }}>
+          {assistantMessages.map((msg, index) => (
+            <div
+              key={index}
+              className={`chat-message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
+            >
+              {msg.role === 'assistant' && (
+                <div className="assistant-avatar">TQ</div>
+              )}
+              <div className="message-bubble">
+                {msg.content}
+              </div>
+            </div>
+          ))}
+
+          {isAILoading && (
+            <div className="chat-message assistant-message">
+              <div className="assistant-avatar">TQ</div>
+              <div className="message-bubble loading-bubble">
+                <span className="dot" /><span className="dot" /><span className="dot" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="assistant-upload">
+          <label className="upload-btn">
+              {uploadedFileName || 'Upload PDF or Word doc'}
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={handleDocumentUpload}
+              style={{ display: 'none' }}
+            />
+          </label>
         </div>
 
         <div className="assistant-input">
-          <input placeholder="Type here (disabled for now)..." disabled />
-          <button disabled>→</button>
+          <input
+            placeholder={ollamaRunning ? "Describe your task or answer the question..." : "Start Ollama to use AI..."}
+            value={assistantInput}
+            onChange={e => setAssistantInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAssistantSend()}
+            disabled={!ollamaRunning || isAILoading}
+          />
+          <button
+            className="assistant-send-btn"
+            onClick={handleAssistantSend}
+            disabled={!ollamaRunning || isAILoading}
+          >
+            <ArrowUp size={18} />
+          </button>
         </div>
       </aside>
 
