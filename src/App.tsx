@@ -8,8 +8,119 @@
 
 import { useState, useEffect, type MouseEvent } from 'react'
 import './App.css'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2 } from 'lucide-react'
 import { Workspace, Subtask } from './types'
+
+function SortableWorkspaceItem({
+  workspace,
+  isSelected,
+  openMenuId,
+  onSelect,
+  onMenuToggle,
+  onArchive,
+  onDelete,
+  isDarkMode
+}: {
+  workspace: Workspace
+  isSelected: boolean
+  openMenuId: number | null
+  onSelect: (id: number) => void
+  onMenuToggle: (e: React.MouseEvent, id: number) => void
+  onArchive: (id: number) => void
+  onDelete: (e: React.MouseEvent<HTMLButtonElement>, id: number) => void
+  isDarkMode: boolean
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: workspace.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: 'grab'
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`workspace-item ${workspace.type} ${isSelected ? 'selected' : ''}`}
+      onClick={() => onSelect(workspace.id)}
+    >
+      <div className="workspace-header">
+        <span className="workspace-type">{workspace.type.toUpperCase()}</span>
+        <button
+          className="workspace-menu-btn"
+          onClick={(e) => onMenuToggle(e, workspace.id)}
+          title="Workspace actions"
+        >
+          <MoreHorizontal size={15} />
+        </button>
+
+        {openMenuId === workspace.id && (
+          <div className="workspace-dropdown">
+            <button
+              className="workspace-dropdown-item"
+              onClick={(e) => {
+                e.stopPropagation()
+                onArchive(workspace.id)
+              }}
+            >
+              <Archive size={14} /> Archive
+            </button>
+            <button
+              className="workspace-dropdown-item delete"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(e, workspace.id)
+              }}
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          </div>
+        )}
+      </div>
+      <span className="workspace-title">{workspace.title}</span>
+      <div className="workspace-stats">
+        <span className="workspace-points">
+          <DiamondIcon size={11} color={isDarkMode ? '#f97316' : '#6366f1'} /> {workspace.points} pts
+        </span>
+        <span className="workspace-progress-text">{workspace.progress}%</span>
+      </div>
+      <div className="workspace-progress-bar">
+        <div
+          className="workspace-progress-fill"
+          style={{ width: `${workspace.progress}%` }}
+        />
+      </div>
+    </div>
+  )
+}
 
 function DiamondIcon({ size = 16, color = 'currentColor' }: { size?: number, color?: string }) {
   return (
@@ -291,6 +402,28 @@ export default function App() {
     setSelectedWorkspaceId(workspaceId)
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8
+      }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setWorkspaces(items => {
+      const oldIndex = items.findIndex(w => w.id === active.id)
+      const newIndex = items.findIndex(w => w.id === over.id)
+      return arrayMove(items, oldIndex, newIndex)
+    })
+  }
+
   const handleDeleteWorkspace = (e: MouseEvent<HTMLButtonElement>, workspaceId: number) => {
     e.stopPropagation();
     if (workspaces.length === 1) return;
@@ -375,71 +508,35 @@ export default function App() {
         </div>
 
         <div className="workspace-list">
-          {/* Empty state */}
           {workspaces.length === 0 && <div className="empty-left">No tasks yet</div>}
 
-          {/* List is NOT hard-coded; it comes from state */}
-
-
-          {workspaces.map((workspace) => (
-            <div 
-              key={workspace.id}
-              className={`workspace-item ${workspace.type} ${selectedWorkspaceId === workspace.id ? 'selected' : ''}`}
-              onClick={() => handleSelectWorkspace(workspace.id as number)}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={workspaces.map(w => w.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className="workspace-header">
-                <span className="workspace-type">{workspace.type.toUpperCase()}</span>
-                <button
-                  className="workspace-menu-btn"
-                  onClick={(e) => {
+              {workspaces.map(workspace => (
+                <SortableWorkspaceItem
+                  key={workspace.id}
+                  workspace={workspace}
+                  isSelected={selectedWorkspaceId === workspace.id}
+                  openMenuId={openMenuId}
+                  onSelect={handleSelectWorkspace}
+                  onMenuToggle={(e, id) => {
                     e.stopPropagation()
-                    setOpenMenuId(openMenuId === workspace.id ? null : workspace.id)
+                    setOpenMenuId(openMenuId === id ? null : id)
                   }}
-                  title="Workspace actions"
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-
-                {openMenuId === workspace.id && (
-                  <div className="workspace-dropdown">
-                    <button
-                      className="workspace-dropdown-item"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleArchiveWorkspace(workspace.id)
-                        setOpenMenuId(null)
-                      }}
-                    >
-                      <Archive size={14} /> Archive
-                    </button>
-                    <button
-                      className="workspace-dropdown-item delete"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteWorkspace(e as MouseEvent<HTMLButtonElement>, workspace.id)
-                        setOpenMenuId(null)
-                      }}
-                    >
-                      <Trash2 size={14} /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-              <span className="workspace-title">{workspace.title}</span>
-              <div className="workspace-stats">
-                <span className="workspace-points">
-                  <DiamondIcon size={11} color="#6366f1" /> {workspace.points} pts
-                </span>
-                <span className="workspace-progress-text">{workspace.progress}%</span>
-              </div>
-              <div className="workspace-progress-bar">
-                <div 
-                  className="workspace-progress-fill" 
-                  style={{ width: `${workspace.progress}%` }}
-                ></div>
-              </div>
-            </div>
-          ))}
+                  onArchive={handleArchiveWorkspace}
+                  onDelete={handleDeleteWorkspace}
+                  isDarkMode={isDarkMode}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* ARCHIVED SECTION */}
