@@ -292,92 +292,107 @@ export default function App() {
           <>
             <div className="center-header">
               <div className="crumbs">
-                {currentWorkspace.type === 'task' ? 'Daily Task' : 'Project'} <span>›</span> <span>Workspace</span>
+                {currentWorkspace.type === 'task' ? 'Daily Task' : 'Project'}{' '}
+                <span>›</span> <span>Workspace</span>
               </div>
 
-              <h1>{currentWorkspace?.title}</h1>
-              <p>{currentWorkspace?.description}</p>
+              <h1>{currentWorkspace.title}</h1>
+              <p>{currentWorkspace.description}</p>
 
-              <div className="meta">
-                <span>⚡ {currentWorkspace?.points || 0} pts earned</span>
+              <div className="header-divider" />
+
+              <div className="header-stats">
+                <span className="pts-badge">
+                  ⚡ {currentWorkspace.points} pts earned
+                </span>
               </div>
 
               <div className="progress-row">
-                <div className="progress-label">Progress</div>
-                <div
-                  className="progress-bar"
-                  role="progressbar"
-                  aria-valuenow={calculateProgress(currentWorkspace)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div className="bar" style={{ width: `${calculateProgress(currentWorkspace)}%` }} />
-                </div>
-                <div className="progress-percent">{calculateProgress(currentWorkspace)}%</div>
+                <span className="progress-label">Progress</span>
+                <span className="progress-percent">{calculateProgress(currentWorkspace)}%</span>
               </div>
 
-              <div className="progress-container">
-                <div className="progress-bar" style={{ width: `${calculateProgress(currentWorkspace)}%` }}></div>
-                <span className="progress-text">{calculateProgress(currentWorkspace)}% Complete</span>
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${calculateProgress(currentWorkspace)}%` }}
+                />
               </div>
             </div>
 
             <div className="execution-plan">
-              <div className="section-header">
-                <h2>Execution Plan</h2>
-                {(currentWorkspace?.subtasks?.length ?? 0) === 0 && <span className="no-subtasks">No subtasks yet</span>}
-              </div>
+              <div className="execution-card">
 
-              <div className="subtasks-list">
-                {currentWorkspace?.subtasks.map((subtask) => (
-                  <div 
-                    key={subtask.id} 
-                    className={`subtask-item ${subtask.done ? 'completed' : ''}`}
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={subtask.done}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleToggleSubtask(subtask.id);
-                      }}
-                      className="subtask-checkbox"
-                    />
-                    <span className="subtask-title">{subtask.title}</span>
-                    <span className="subtask-points">+{subtask.points} pts</span>
-                  </div>
-                ))}
-              </div>
+                {/* Header */}
+                <div className="execution-header">
+                  <h2>Execution Plan</h2>
+                  {currentWorkspace.subtasks.length === 0 && (
+                    <span className="no-subtasks-pill">No subtasks yet</span>
+                  )}
+                </div>
 
-              <div className="add-subtask-container">
-                <input
-                  type="text"
-                  value={newSubtaskTitle}
-                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddSubtask()}
-                  placeholder="Add a subtask..."
-                  className="add-subtask-input"
-                />
-                <button onClick={handleAddSubtask} className="add-subtask-btn">
-                  Add
+                <div className="execution-divider" />
+
+                {/* Empty state */}
+                {currentWorkspace.subtasks.length === 0 && (
+                  <p className="execution-empty">No subtasks added yet — add one below.</p>
+                )}
+
+                {/* Subtasks list */}
+                <div className="subtasks-list">
+                  {currentWorkspace.subtasks.map((subtask) => (
+                    <div
+                      key={subtask.id}
+                      className={`subtask-item ${subtask.done ? 'completed' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={subtask.done}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleToggleSubtask(subtask.id)
+                        }}
+                        className="subtask-checkbox"
+                      />
+                      <span className="subtask-title">{subtask.title}</span>
+                      <span className="subtask-points">+{subtask.points} pts</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input row */}
+                <div className="execution-input-row">
+                  <input
+                    type="text"
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
+                    placeholder="Add a subtask..."
+                    className="execution-input"
+                  />
+                  <button onClick={handleAddSubtask} className="execution-add-btn">
+                    + Add
+                  </button>
+                </div>
+
+                <div className="execution-divider" />
+
+                {/* Finish button */}
+                <button
+                  onClick={handleFinishTask}
+                  className="task-finished-btn"
+                  disabled={calculateProgress(currentWorkspace) === 100}
+                >
+                  {calculateProgress(currentWorkspace) === 100 ? '✓ Task Completed' : '✓ Mark Task as Finished'}
                 </button>
+
+                {/* Activity Log */}
+                <div className="activity-log">
+                  <h3>Activity Log</h3>
+                  <p className="activity-empty">Completed subtasks will appear here</p>
+                </div>
+
               </div>
-
-              <button 
-                onClick={handleFinishTask}
-                className="task-finished-btn"
-                disabled={calculateProgress(currentWorkspace) === 100}
-              >
-                {calculateProgress(currentWorkspace) === 100 ? '✓ Task Completed' : 'Mark Task as Finished'}
-              </button>
-            </div>
-
-            <div className="section">
-              <div className="section-title">
-                <h2>Activity Log</h2>
-              </div>
-
-              <div className="empty-card">Ready to start working</div>
             </div>
 
             {/* FUTURE: Put subtasks UI + log timeline here */}
