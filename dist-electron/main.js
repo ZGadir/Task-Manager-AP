@@ -11,10 +11,15 @@ let win;
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    minWidth: 900,
+    minHeight: 600,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname$1, "preload.mjs")
     }
   });
+  win.maximize();
+  win.show();
   win.webContents.on("did-finish-load", () => {
     win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
