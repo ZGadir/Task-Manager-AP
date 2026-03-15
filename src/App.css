@@ -72,6 +72,12 @@ html, body, #root {
   font-weight: 700;
 }
 
+.logo-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
 .title {
   font-weight: 800;
 }
@@ -757,6 +763,7 @@ html, body, #root {
 
 /* Better outlined workspace items */
 .workspace-item {
+  position: relative;
   padding: 12px 16px;
   margin-bottom: 8px;
   border-radius: 8px;
@@ -782,8 +789,96 @@ html, body, #root {
 
 .workspace-header {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.workspace-menu-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 2px 4px;
+  border-radius: 4px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.workspace-item:hover .workspace-menu-btn {
+  opacity: 1;
+}
+
+.workspace-menu-btn:hover {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.workspace-dropdown {
+  position: absolute;
+  right: 8px;
+  top: 32px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.workspace-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-dropdown-item:hover {
+  background: #f8fafc;
+}
+
+.workspace-dropdown-item.delete {
+  color: #ef4444;
+}
+
+.workspace-dropdown-item.delete:hover {
+  background: #fee2e2;
+}
+
+/* Dark mode dropdown */
+.dark .workspace-dropdown {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.dark .workspace-dropdown-item {
+  color: #94a3b8;
+}
+
+.dark .workspace-dropdown-item:hover {
+  background: #273549;
+}
+
+.dark .workspace-dropdown-item.delete:hover {
+  background: #450a0a;
+}
+
+.dark .workspace-menu-btn:hover {
+  background: #334155;
+  color: #e2e8f0;
 }
 
 .workspace-type {
@@ -797,6 +892,33 @@ html, body, #root {
   font-size: 14px;
   font-weight: 500;
   color: #1a1a1a;
+}
+
+.workspace-delete-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  margin-left: auto;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-delete-btn:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+.dark .workspace-delete-btn:hover {
+  background: #450a0a;
+  color: #ef4444;
 }
 
 .workspace-progress-bar {
@@ -1162,4 +1284,260 @@ html, body, #root {
   background: #6366f1;
   border-radius: 999px;
   transition: width 0.3s ease;
+}
+
+/* =========================================================
+   DARK MODE
+   ========================================================= */
+.dark {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.dark .progress-percent {
+  color: #f97316 !important;
+}
+
+.dark .sidebar {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .sidebar-header {
+  border-color: #334155;
+}
+
+.dark .sidebar-footer {
+  border-color: #334155;
+}
+
+.dark .workspace-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .workspace-item:hover {
+  background: #273549;
+}
+
+.dark .workspace-item.selected {
+  background: #1e1b4b;
+  border-color: #6366f1;
+}
+
+.dark .workspace-item.project.selected {
+  background: #1c1008;
+  border-color: #f97316;
+}
+
+.dark .workspace-title {
+  color: #e2e8f0;
+}
+
+.dark .workspace-points,
+.dark .workspace-progress-text {
+  color: #94a3b8;
+}
+
+.dark .overall-points {
+  background: linear-gradient(135deg, #c2410c 0%, #f97316 100%);
+}
+
+.dark .center {
+  background: #0f172a;
+}
+
+.dark .center-header h1 {
+  color: #f1f5f9;
+}
+
+.dark .center-header p {
+  color: #94a3b8;
+}
+
+.dark .crumbs {
+  color: #64748b;
+}
+
+.dark .crumbs span {
+  color: #f97316;
+}
+
+.dark .header-divider,
+.dark .execution-divider {
+  background: #1e293b;
+}
+
+.dark .execution-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .execution-header h2 {
+  color: #f1f5f9;
+}
+
+.dark .no-subtasks-pill {
+  background: #334155;
+  color: #64748b;
+}
+
+.dark .execution-empty {
+  color: #475569;
+}
+
+.dark .subtask-item {
+  background: #273549;
+}
+
+.dark .subtask-title {
+  color: #e2e8f0;
+}
+
+.dark .subtask-points {
+  color: #f97316;
+}
+
+.dark .subtask-checkbox {
+  accent-color: #f97316;
+}
+
+.dark .execution-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .execution-input:focus {
+  border-color: #f97316;
+}
+
+.dark .execution-input::placeholder {
+  color: #475569;
+}
+
+.dark .execution-add-btn {
+  background: #f97316;
+}
+
+.dark .execution-add-btn:hover {
+  background: #ea6c0a;
+}
+
+.dark .activity-log h3 {
+  color: #e2e8f0;
+}
+
+.dark .activity-empty {
+  color: #475569;
+}
+
+.dark .assistant {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .assistant-header {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .assistant-title {
+  color: #f97316;
+}
+
+.dark .assistant-input {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .assistant-input input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .mode.active {
+  background: #f97316;
+  border-color: #f97316;
+  color: white;
+}
+
+.dark .mode {
+  background: #1e293b;
+  border-color: #334155;
+  color: #475569;
+}
+
+.dark .card {
+  background: #273549;
+  border-color: #334155;
+}
+
+.dark .modal {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.dark .modal-header {
+  border-color: #334155;
+}
+
+.dark .modal-header h3 {
+  color: #f1f5f9;
+}
+
+.dark .modal-header p {
+  color: #94a3b8;
+}
+
+.dark .field span {
+  color: #94a3b8;
+}
+
+.dark .field input,
+.dark .field textarea,
+.dark .field select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .field input:focus,
+.dark .field textarea:focus,
+.dark .field select:focus {
+  border-color: #f97316;
+}
+
+.dark .btn.ghost {
+  background: #273549;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.dark .btn.primary {
+  background: #f97316;
+}
+
+.dark .btn.primary:hover {
+  background: #ea6c0a;
+}
+
+.dark .icon-btn {
+  background: #273549;
+  border-color: #334155;
+  color: #f97316;
+}
+
+.dark .pts-badge {
+  background: #1c1008;
+  color: #f97316;
+}
+
+.dark .progress-track {
+  background: #1e293b;
+}
+
+.dark .progress-fill {
+  background: #f97316;
 }

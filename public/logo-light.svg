@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <rect width="160" height="160" rx="24" fill="white" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="80" y="82" font-size="64" font-weight="800" 
+    text-anchor="middle" 
+    dominant-baseline="central"
+    fill="#0f172a" 
+    font-family="Georgia, serif">TQ</text>
+  <!-- Pill shapes -->
+  <rect x="18" y="132" width="22" height="10" rx="5" fill="#6366f1"/>
+  <rect x="46" y="132" width="22" height="10" rx="5" fill="#10b981"/>
+  <rect x="74" y="132" width="22" height="10" rx="5" fill="#f59e0b"/>
+  <rect x="102" y="132" width="22" height="10" rx="5" fill="#f97316"/>
+  <rect x="130" y="132" width="22" height="10" rx="5" fill="#ef4444"/>
+</svg>

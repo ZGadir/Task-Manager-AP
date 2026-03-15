@@ -6,29 +6,39 @@
 // Right = Assistant panel (UI only for now)
 // ===============================
 
-import { useState } from 'react'
+import { useState, useEffect, type MouseEvent } from 'react'
 import './App.css'
-import { Plus } from 'lucide-react'
+import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2 } from 'lucide-react'
+import { Workspace, Subtask, AssistantState } from './types'
 
-
-// ===============================
-// TYPES (DATA MODEL)
-// ===============================
-interface Subtask {
-  id: number
-  title: string
-  done: boolean
-  points: number
-}
-
-interface Workspace {
-  id: number
-  type: 'task' | 'project'
-  title: string
-  description: string
-  subtasks: Subtask[]
-  points: number
-  progress: number
+function DiamondIcon({ size = 16, color = 'currentColor' }: { size?: number, color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Main body */}
+      <polygon
+        points="12,2 22,9 12,22 2,9"
+        fill={color}
+      />
+      {/* Top right face — lighter */}
+      <polygon
+        points="12,2 22,9 12,9"
+        fill="white"
+        opacity="0.35"
+      />
+      {/* Bottom left face — darker */}
+      <polygon
+        points="2,9 12,9 12,22"
+        fill="black"
+        opacity="0.2"
+      />
+      {/* Inner shine — small highlight top */}
+      <polygon
+        points="12,4 18,9 12,9"
+        fill="white"
+        opacity="0.25"
+      />
+    </svg>
+  )
 }
 
 
@@ -36,34 +46,38 @@ export default function App() {
   // ===============================
   // STATE: Workspaces + Selection
   // ===============================
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([
-    {
-      id: 1,
-      type: 'task',
-      title: 'Prepare Quarterly Report',
-      description: 'Summarize financial performance and team KPIs.',
-      subtasks: [
-        { id: 1, title: "Gather Q4 data", done: false, points: 100 },
-        { id: 2, title: "Create charts", done: false, points: 150 },
-        { id: 3, title: "Write executive summary", done: false, points: 200 },
-      ],
-      points: 0,
-      progress: 0,
-    },
-    {
-      id: 2,
-      type: 'project',
-      title: 'Redesign Q1 Landing Page',
-      description: 'Update hero section + CTA buttons for better conversion.',
-      subtasks: [
-        { id: 1, title: "Analyze current conversion metrics", done: false, points: 100 },
-        { id: 2, title: "Create wireframes for new hero section", done: false, points: 150 },
-        { id: 3, title: "Design CTA button variations", done: false, points: 100 },
-      ],
-      points: 0,
-      progress: 0,
-    }
-  ])
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
+    const saved = localStorage.getItem('workspaces')
+    if (saved) return JSON.parse(saved)
+    return [
+      {
+        id: 1,
+        type: 'task',
+        title: 'Prepare Quarterly Report',
+        description: 'Summarize financial performance and team KPIs.',
+        subtasks: [
+          { id: 1, title: 'Gather Q4 data', done: false, points: 100 },
+          { id: 2, title: 'Create charts', done: false, points: 150 },
+          { id: 3, title: 'Write executive summary', done: false, points: 200 },
+        ],
+        points: 0,
+        progress: 0,
+      },
+      {
+        id: 2,
+        type: 'project',
+        title: 'Redesign Q1 Landing Page',
+        description: 'Update hero section + CTA buttons for better conversion.',
+        subtasks: [
+          { id: 1, title: 'Analyze current conversion metrics', done: false, points: 100 },
+          { id: 2, title: 'Create wireframes for new hero section', done: false, points: 150 },
+          { id: 3, title: 'Design CTA button variations', done: false, points: 100 },
+        ],
+        points: 0,
+        progress: 0,
+      },
+    ]
+  })
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(1)
   // ===============================
   // STATE: Create Task/Project Modal
@@ -71,7 +85,23 @@ export default function App() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('darkMode') === 'true'
+  })
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      localStorage.setItem('darkMode', String(!prev))
+      return !prev
+    })
+  }
+
   const [notification, setNotification] = useState<{message: string; show: boolean}>({message: '', show: false})  // eslint-disable-next-line @typescript-eslint/no-unused-vars  const [completedTasksStreak, setCompletedTasksStreak] = useState(0)
+
+  useEffect(() => {
+    localStorage.setItem('workspaces', JSON.stringify(workspaces))
+  }, [workspaces])
 
   // Get current workspace
   const currentWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
@@ -185,6 +215,16 @@ export default function App() {
     showNotification(`🎉 Task completed! You earned ${totalSubtaskPoints} points!`);
   };
 
+  const handleDeleteWorkspace = (e: MouseEvent<HTMLButtonElement>, workspaceId: number) => {
+    e.stopPropagation();
+    if (workspaces.length === 1) return;
+    const remaining = workspaces.filter(w => w.id !== workspaceId);
+    setWorkspaces(remaining);
+    if (selectedWorkspaceId === workspaceId) {
+      setSelectedWorkspaceId(remaining[0].id);
+    }
+  };
+
   const handleSelectWorkspace = (workspaceId: number) => {
     setSelectedWorkspaceId(workspaceId);
     setNewSubtaskTitle(""); // Clear input when switching
@@ -219,7 +259,7 @@ export default function App() {
   // ===============================
 
   return (
-    <div className="app">
+    <div className={`app ${isDarkMode ? 'dark' : ''}`}>
       {/* =======================================================
           LEFT PANEL (SIDEBAR): Workspaces list + Add button
           ======================================================= */}
@@ -227,8 +267,12 @@ export default function App() {
           
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="logo">⚡</div>
-          <div className="title">Workspaces</div>
+          <img
+            src={isDarkMode ? '/logo-orange.svg' : '/logo-dark.svg'}
+            alt="TaskQuest"
+            className="logo-img"
+          />
+          <div className="title">TaskQuest</div>
 
           {/* NEW: Plus button opens Create modal */}
           <button
@@ -238,11 +282,18 @@ export default function App() {
           >
             <Plus size={18} />
           </button>
+          <button
+            className="icon-btn"
+            title="Toggle Dark Mode"
+            onClick={toggleDarkMode}
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </div>
 
         {/* Overall points display */}
         <div className="overall-points">
-          <span className="points-icon">⚡</span>
+          <DiamondIcon size={28} color="white" />
           <span className="points-value">{totalOverallPoints}</span>
           <span className="points-label">Total Points</span>
         </div>
@@ -262,10 +313,46 @@ export default function App() {
             >
               <div className="workspace-header">
                 <span className="workspace-type">{workspace.type.toUpperCase()}</span>
-                <span className="workspace-title">{workspace.title}</span>
+                <button
+                  className="workspace-menu-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenMenuId(openMenuId === workspace.id ? null : workspace.id)
+                  }}
+                  title="Workspace actions"
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+
+                {openMenuId === workspace.id && (
+                  <div className="workspace-dropdown">
+                    <button
+                      className="workspace-dropdown-item"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenMenuId(null)
+                      }}
+                    >
+                      <Archive size={14} /> Archive
+                    </button>
+                    <button
+                      className="workspace-dropdown-item delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteWorkspace(e as MouseEvent<HTMLButtonElement>, workspace.id)
+                        setOpenMenuId(null)
+                      }}
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
+              <span className="workspace-title">{workspace.title}</span>
               <div className="workspace-stats">
-                <span className="workspace-points">{workspace.points} pts</span>
+                <span className="workspace-points">
+                  <DiamondIcon size={11} color="#6366f1" /> {workspace.points} pts
+                </span>
                 <span className="workspace-progress-text">{workspace.progress}%</span>
               </div>
               <div className="workspace-progress-bar">
@@ -303,7 +390,7 @@ export default function App() {
 
               <div className="header-stats">
                 <span className="pts-badge">
-                  ⚡ {currentWorkspace.points} pts earned
+                  <DiamondIcon size={14} color="#f97316" /> {currentWorkspace.points} pts earned
                 </span>
               </div>
 
@@ -344,18 +431,20 @@ export default function App() {
                     <div
                       key={subtask.id}
                       className={`subtask-item ${subtask.done ? 'completed' : ''}`}
+                      onClick={() => handleToggleSubtask(subtask.id)}
+                      style={{ cursor: 'pointer' }}
                     >
                       <input
                         type="checkbox"
                         checked={subtask.done}
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          handleToggleSubtask(subtask.id)
-                        }}
+                        onChange={() => handleToggleSubtask(subtask.id)}
                         className="subtask-checkbox"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <span className="subtask-title">{subtask.title}</span>
-                      <span className="subtask-points">+{subtask.points} pts</span>
+                      <span className="subtask-points">
+                        <DiamondIcon size={11} color="#6366f1" /> +{subtask.points} pts
+                      </span>
                     </div>
                   ))}
                 </div>
