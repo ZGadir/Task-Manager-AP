@@ -201,9 +201,18 @@ export default function App() {
   const [modalDescription, setModalDescription] = useState('')
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
-  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([])
+  const [chatHistories, setChatHistories] = useState<Record<number, AssistantMessage[]>>({})
   const [assistantInput, setAssistantInput] = useState('')
   const [assistantMode, setAssistantMode] = useState<'questioning' | 'planning' | 'execution' | 'review'>('questioning')
+  const assistantMessages = chatHistories[selectedWorkspaceId] || []
+
+  const setAssistantMessages = (updater: AssistantMessage[] | ((prev: AssistantMessage[]) => AssistantMessage[])) => {
+    setChatHistories(prev => {
+      const current = prev[selectedWorkspaceId] || []
+      const next = typeof updater === 'function' ? updater(current) : updater
+      return { ...prev, [selectedWorkspaceId]: next }
+    })
+  }
   const [isAILoading, setIsAILoading] = useState(false)
   const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
   const [uploadedDocument, setUploadedDocument] = useState<string>('')
@@ -247,19 +256,40 @@ export default function App() {
   useEffect(() => {
     checkOllamaRunning().then(running => {
       setOllamaRunning(running)
-      if (running) {
-        setAssistantMessages([{
-          role: 'assistant',
-          content: `Hi! I'm your TaskQuest AI assistant. How can I help you with your task today?`
-        }])
-      } else {
-        setAssistantMessages([{
-          role: 'assistant',
-          content: `⚠️ Ollama is not running.\n\nTo use the AI assistant:\n1. Open a terminal\n2. Run: ollama run qwen2.5:7b\n3. Come back and refresh the app`
-        }])
-      }
     })
   }, [])
+
+  // When selectedWorkspaceId changes and chat is empty, generate greeting
+  useEffect(() => {
+    if (!selectedWorkspaceId || !ollamaRunning) return
+    const currentMessages = chatHistories[selectedWorkspaceId]
+    if (currentMessages && currentMessages.length > 0) return // already has chat
+
+    const workspace = workspaces.find(w => w.id === selectedWorkspaceId)
+    if (!workspace) return
+
+    const generateGreeting = async () => {
+      try {
+        const { getGreetingPrompt, sendToAI } = await import('./aiService')
+        const greeting = await sendToAI([
+          { role: 'system', content: getGreetingPrompt(workspace.title, workspace.description) },
+          { role: 'user', content: 'hello' }
+        ])
+        setChatHistories(prev => ({
+          ...prev,
+          [selectedWorkspaceId]: [{ role: 'assistant', content: greeting }]
+        }))
+      } catch {
+        // fallback to default message
+        setChatHistories(prev => ({
+          ...prev,
+          [selectedWorkspaceId]: [{ role: 'assistant', content: `Hi! I'm your TaskQuest AI assistant. How can I help you with your task today?` }]
+        }))
+      }
+    }
+
+    generateGreeting()
+  }, [selectedWorkspaceId])
 
   useEffect(() => {
     if (assistantBodyRef.current) {
@@ -444,14 +474,6 @@ export default function App() {
 
   const handleAssistantSend = async () => {
     if (!assistantInput.trim() || isAILoading) return
-    if (!currentWorkspace) {
-      setAssistantMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Please select or create a task first, then I can help you break it down!'
-      }])
-      setAssistantInput('')
-      return
-    }
 
     const userMessage = assistantInput.trim()
     setAssistantInput('')
@@ -459,72 +481,135 @@ export default function App() {
     setIsAILoading(true)
 
     try {
+      const conversationHistory = assistantMessages.map(m => ({
+        role: m.role as 'user' | 'assistant' | 'system',
+        content: m.content
+      }))
+
       if (assistantMode === 'questioning') {
-        const conversationHistory = assistantMessages.map(m => ({
-          role: m.role as 'user' | 'assistant' | 'system',
-          content: m.content
-        }))
-
-        // Free chat — send full conversation history
-        const { sendToAI } = await import('./aiService')
-
-        const systemPrompt = {
-          role: 'system' as const,
-          content: `You are TaskQuest AI assistant — a helpful, friendly assistant that helps users plan and break down tasks. 
-You can have normal conversations but always try to guide the user towards breaking down their current task.
-Current task: ${currentWorkspace?.title || 'None selected'}
-Description: ${currentWorkspace?.description || 'None'}`
+        if (!currentWorkspace) {
+          setAssistantMessages(prev => [...prev, {
+            role: 'assistant',
+            content: 'Please select or create a task first so I can help you plan it.'
+          }])
+          setIsAILoading(false)
+          return
         }
 
-        const messages = [
-          systemPrompt,
-          ...conversationHistory,
-          { role: 'user' as const, content: userMessage }
-        ]
-
-        const response = await sendToAI(messages)
+        const { sendQuestioningMessage } = await import('./aiService')
+        const response = await sendQuestioningMessage(
+          currentWorkspace.title,
+          currentWorkspace.description,
+          [...conversationHistory, { role: 'user' as const, content: userMessage }]
+        )
 
         setAssistantMessages(prev => [...prev, {
           role: 'assistant',
           content: response
         }])
+
       } else if (assistantMode === 'planning') {
+        if (!currentWorkspace) return
+
         setAssistantMessages(prev => [...prev, {
           role: 'assistant',
-          content: '⏳ Analysing your task and generating subtasks...'
+          content: 'Generating your subtasks...'
         }])
+
+        const conversationSummary = assistantMessages
+          .map(m => m.content)
+          .join(' ')
+          .slice(0, 500)
 
         const result = await generateSubtasks(
           currentWorkspace.title,
-          userMessage,
+          currentWorkspace.description,
+          conversationSummary,
+          undefined,
           uploadedDocument || undefined
         )
 
-        const newSubtasks: Subtask[] = result.subtasks.map((title, index) => ({
-          id: Date.now() + index,
-          title,
-          done: false,
-          points: 100
-        }))
+        if (result.subtasks.length > 0) {
+          const newSubtasks: Subtask[] = result.subtasks.map((s, index) => ({
+            id: Date.now() + index,
+            title: s.title,
+            done: false,
+            points: s.points
+          }))
 
-        updateWorkspace(currentWorkspace.id, {
-          subtasks: [...currentWorkspace.subtasks, ...newSubtasks]
-        })
+          updateWorkspace(currentWorkspace.id, {
+            subtasks: [...currentWorkspace.subtasks, ...newSubtasks]
+          })
 
-        setAssistantMessages(prev => [
-          ...prev.slice(0, -1),
-          {
-            role: 'assistant',
-            content: `✅ I've generated ${result.subtasks.length} subtasks for you!\n\n**Why these subtasks?**\n${result.reasoning}\n\nYou can see them in the Execution Plan. Good luck! 🚀`
-          }
-        ])
+          setAssistantMessages(prev => [
+            ...prev.slice(0, -1),
+            {
+              role: 'assistant',
+              content: `I've created ${result.subtasks.length} subtasks for you (${result.totalPoints} pts total).\n\n${result.reasoning}\n\nYou can see them in the Execution Plan. Ask me if you need any guidance along the way.`
+            }
+          ])
 
-        setAssistantMode('execution')
+          setAssistantMode('execution')
+        } else {
+          setAssistantMessages(prev => [
+            ...prev.slice(0, -1),
+            {
+              role: 'assistant',
+              content: 'I had trouble generating subtasks. Could you give me a bit more detail about what needs to be done?'
+            }
+          ])
+        }
+
+      } else if (assistantMode === 'execution') {
+        if (!currentWorkspace) return
+
+        const { sendExecutionMessage } = await import('./aiService')
+
+        const completedSubtasks = currentWorkspace.subtasks
+          .filter(s => s.done)
+          .map(s => s.title)
+
+        const pendingSubtasks = currentWorkspace.subtasks
+          .filter(s => !s.done)
+          .map(s => s.title)
+
+        const response = await sendExecutionMessage(
+          currentWorkspace.title,
+          completedSubtasks,
+          pendingSubtasks,
+          [...conversationHistory, { role: 'user' as const, content: userMessage }]
+        )
+
+        setAssistantMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response
+        }])
+
+      } else if (assistantMode === 'review') {
+        if (!currentWorkspace) return
+
+        const { sendReviewMessage } = await import('./aiService')
+
+        const completedSubtasks = currentWorkspace.subtasks
+          .filter(s => s.done)
+          .map(s => s.title)
+
+        const response = await sendReviewMessage(
+          currentWorkspace.title,
+          completedSubtasks,
+          [...conversationHistory, { role: 'user' as const, content: userMessage }]
+        )
+
+        setAssistantMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response
+        }])
       }
+
     } catch (error) {
       setAssistantMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ Something went wrong. Make sure Ollama is running and try again.'
+        content: 'Something went wrong. Make sure Ollama is running and try again.'
       }])
     } finally {
       setIsAILoading(false)
@@ -1069,16 +1154,22 @@ Description: ${currentWorkspace?.description || 'None'}`
                 setModalDescription('')
               }}
             >
-              <label className="field">
-                <span>Description (messy is OK)</span>
-                <div className="field-with-btn">
-                  <textarea
-                    name="description"
-                    rows={4}
-                    placeholder="Paste notes here... e.g. need to finish ml coursework, implement model, write report"
-                    value={modalDescription}
-                    onChange={(e) => setModalDescription(e.target.value)}
-                  />
+              <div className="field modal-field">
+                <label>Title</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  placeholder="e.g., Fix memory leak"
+                  value={modalTitle}
+                  onChange={e => setModalTitle(e.target.value)}
+                  className="modal-input"
+                />
+              </div>
+
+              <div className="field modal-field">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ margin: 0 }}>Description <span style={{ fontWeight: 400, opacity: 0.6 }}>(messy is OK)</span></label>
                   <button
                     type="button"
                     className={`improve-ai-icon-btn ${isImprovingAI ? 'loading' : ''}`}
@@ -1089,22 +1180,33 @@ Description: ${currentWorkspace?.description || 'None'}`
                     <Sparkles size={15} />
                   </button>
                 </div>
-              </label>
+                <div style={{ position: 'relative' }}>
+                  {isImprovingAI && (
+                    <div className="improve-loading-overlay">
+                      <div className="improve-loading-spinner" />
+                      <span>AI is improving...</span>
+                    </div>
+                  )}
+                  <textarea
+                    name="description"
+                    placeholder="Paste notes here... e.g. need to finish ml coursework, implement model, write report"
+                    value={modalDescription}
+                    onChange={e => {
+                      setModalDescription(e.target.value)
+                      e.target.style.height = 'auto'
+                      const newHeight = Math.min(e.target.scrollHeight, 260)
+                      e.target.style.height = newHeight + 'px'
+                      e.target.style.overflowY = newHeight >= 260 ? 'scroll' : 'hidden'
+                    }}
+                    className="modal-textarea"
+                    style={{ opacity: isImprovingAI ? 0.4 : 1, padding: '12px 14px' }}
+                  />
+                </div>
+              </div>
 
               {!ollamaRunning && (
                 <p className="improve-ai-warning">Start Ollama to use AI improvement</p>
               )}
-
-              <label className="field">
-                <span>Title</span>
-                <input
-                  name="title"
-                  required
-                  placeholder="e.g., Fix memory leak"
-                  value={modalTitle}
-                  onChange={(e) => setModalTitle(e.target.value)}
-                />
-              </label>
 
               <label className="field">
                 <span>Type</span>
