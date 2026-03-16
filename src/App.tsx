@@ -6,12 +6,123 @@
 // Right = Assistant panel (UI only for now)
 // ===============================
 
-import { useState, useEffect, type MouseEvent } from 'react'
+import { useState, useEffect, useRef, type MouseEvent } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import ReactMarkdown from 'react-markdown'
 import './App.css'
-import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp } from 'lucide-react'
+import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles } from 'lucide-react'
 import { Workspace, Subtask, AssistantMessage } from './types'
-import { checkOllamaRunning, generateSubtasks } from './aiService'
+import { checkOllamaRunning, generateSubtasks, improveTaskDescription } from './aiService'
 import { extractDocumentText, truncateDocument } from './documentParser'
+
+function SortableWorkspaceItem({
+  workspace,
+  isSelected,
+  openMenuId,
+  onSelect,
+  onMenuToggle,
+  onArchive,
+  onDelete,
+  isDarkMode
+}: {
+  workspace: Workspace
+  isSelected: boolean
+  openMenuId: number | null
+  onSelect: (id: number) => void
+  onMenuToggle: (e: React.MouseEvent, id: number) => void
+  onArchive: (id: number) => void
+  onDelete: (e: React.MouseEvent<HTMLButtonElement>, id: number) => void
+  isDarkMode: boolean
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: workspace.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`workspace-item ${workspace.type} ${isSelected ? 'selected' : ''}`}
+      onClick={() => onSelect(workspace.id)}
+    >
+      <div className="workspace-header">
+        <span className="workspace-type">{workspace.type.toUpperCase()}</span>
+        <button
+          className="workspace-menu-btn"
+          onClick={(e) => onMenuToggle(e, workspace.id)}
+          title="Workspace actions"
+        >
+          <MoreHorizontal size={15} />
+        </button>
+
+        {openMenuId === workspace.id && (
+          <div className="workspace-dropdown">
+            <button
+              className="workspace-dropdown-item"
+              onClick={(e) => {
+                e.stopPropagation()
+                onArchive(workspace.id)
+              }}
+            >
+              <Archive size={14} /> Archive
+            </button>
+            <button
+              className="workspace-dropdown-item delete"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(e, workspace.id)
+              }}
+            >
+              <Trash2 size={14} /> Delete
+            </button>
+          </div>
+        )}
+      </div>
+      <span className="workspace-title">{workspace.title}</span>
+      <div className="workspace-stats">
+        <span className="workspace-points">
+          <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> {workspace.points} pts
+        </span>
+        <span className="workspace-progress-text">{workspace.progress}%</span>
+      </div>
+      <div className="workspace-progress-bar">
+        <div
+          className="workspace-progress-fill"
+          style={{ width: `${workspace.progress}%` }}
+        />
+      </div>
+    </div>
+  )
+}
 
 function DiamondIcon({ size = 16, color = 'currentColor' }: { size?: number, color?: string }) {
   return (
@@ -85,6 +196,9 @@ export default function App() {
   // STATE: Create Task/Project Modal
   // ===============================
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isImprovingAI, setIsImprovingAI] = useState(false)
+  const [modalTitle, setModalTitle] = useState('')
+  const [modalDescription, setModalDescription] = useState('')
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([])
@@ -102,9 +216,16 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false)
   const [showArchiveModal, setShowArchiveModal] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+  const [recentlyDeleted, setRecentlyDeleted] = useState<{
+    subtask: Subtask
+    workspaceId: number
+    timestamp: number
+  }[]>([])
+  const [showRecentlyDeleted, setShowRecentlyDeleted] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('darkMode') === 'true'
   })
+  const assistantBodyRef = useRef<HTMLDivElement | null>(null)
 
   const toggleDarkMode = () => {
     setIsDarkMode(prev => {
@@ -129,7 +250,7 @@ export default function App() {
       if (running) {
         setAssistantMessages([{
           role: 'assistant',
-          content: `Hi! I'm your TaskQuest AI assistant.\n\nI can help you break down any task into clear subtasks.\n\nTo get started:\n1. Select or create a task on the left\n2. Tell me about it and I'll ask a few questions\n3. Then I'll generate your subtasks automatically\n\nYou can also upload a PDF or Word document and I'll use it to create relevant subtasks.`
+          content: `Hi! I'm your TaskQuest AI assistant. How can I help you with your task today?`
         }])
       } else {
         setAssistantMessages([{
@@ -139,6 +260,12 @@ export default function App() {
       }
     })
   }, [])
+
+  useEffect(() => {
+    if (assistantBodyRef.current) {
+      assistantBodyRef.current.scrollTop = assistantBodyRef.current.scrollHeight
+    }
+  }, [assistantMessages, isAILoading])
 
   // Get current workspace
   const currentWorkspace =
@@ -404,6 +531,68 @@ Description: ${currentWorkspace?.description || 'None'}`
     }
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setWorkspaces(items => {
+      const oldIndex = items.findIndex(w => w.id === active.id)
+      const newIndex = items.findIndex(w => w.id === over.id)
+      return arrayMove(items, oldIndex, newIndex)
+    })
+  }
+
+  const handleDeleteSubtask = (subtaskId: number) => {
+    if (!currentWorkspace) return
+    const subtask = currentWorkspace.subtasks.find(s => s.id === subtaskId)
+    if (!subtask) return
+
+    setRecentlyDeleted(prev => {
+      const updated = [
+        { subtask, workspaceId: selectedWorkspaceId, timestamp: Date.now() },
+        ...prev
+      ]
+      return updated.slice(0, 10)
+    })
+
+    const updatedSubtasks = currentWorkspace.subtasks.filter(s => s.id !== subtaskId)
+    updateWorkspace(selectedWorkspaceId, { subtasks: updatedSubtasks })
+  }
+
+  const handleRestoreSubtask = (index: number) => {
+    const item = recentlyDeleted[index]
+    if (!item) return
+    const workspace = workspaces.find(w => w.id === item.workspaceId)
+    if (!workspace) return
+    const updatedSubtasks = [...workspace.subtasks, item.subtask]
+    updateWorkspace(item.workspaceId, { subtasks: updatedSubtasks })
+    setRecentlyDeleted(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleImproveWithAI = async () => {
+    if (!modalDescription.trim()) return
+    if (!ollamaRunning) return
+
+    setIsImprovingAI(true)
+    try {
+      const result = await improveTaskDescription(modalDescription)
+      if (result.title) setModalTitle(result.title)
+      if (result.description) setModalDescription(result.description)
+    } catch {
+      showNotification('Could not connect to Ollama')
+    } finally {
+      setIsImprovingAI(false)
+    }
+  }
+
   const handleSelectWorkspace = (workspaceId: number) => {
     setSelectedWorkspaceId(workspaceId);
     setNewSubtaskTitle(""); // Clear input when switching
@@ -427,6 +616,8 @@ Description: ${currentWorkspace?.description || 'None'}`
     setWorkspaces((prev) => [newWs, ...prev])
     setSelectedWorkspaceId(id)
     setIsCreateOpen(false)
+    setModalTitle('')
+    setModalDescription('')
   }
 
   // ===============================
@@ -478,71 +669,36 @@ Description: ${currentWorkspace?.description || 'None'}`
         </div>
 
         <div className="workspace-list">
-          {/* Empty state */}
-          {workspaces.length === 0 && <div className="empty-left">No tasks yet</div>}
-
-          {/* List is NOT hard-coded; it comes from state */}
-
-
-          {workspaces.map((workspace) => (
-            <div 
-              key={workspace.id}
-              className={`workspace-item ${workspace.type} ${selectedWorkspaceId === workspace.id ? 'selected' : ''}`}
-              onClick={() => handleSelectWorkspace(workspace.id as number)}
+          {workspaces.length === 0 && (
+            <div className="empty-left">No tasks yet</div>
+          )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={workspaces.map(w => w.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className="workspace-header">
-                <span className="workspace-type">{workspace.type.toUpperCase()}</span>
-                <button
-                  className="workspace-menu-btn"
-                  onClick={(e) => {
+              {workspaces.map(workspace => (
+                <SortableWorkspaceItem
+                  key={workspace.id}
+                  workspace={workspace}
+                  isSelected={selectedWorkspaceId === workspace.id}
+                  openMenuId={openMenuId}
+                  onSelect={handleSelectWorkspace}
+                  onMenuToggle={(e, id) => {
                     e.stopPropagation()
-                    setOpenMenuId(openMenuId === workspace.id ? null : workspace.id)
+                    setOpenMenuId(openMenuId === id ? null : id)
                   }}
-                  title="Workspace actions"
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-
-                {openMenuId === workspace.id && (
-                  <div className="workspace-dropdown">
-                    <button
-                      className="workspace-dropdown-item"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleArchiveWorkspace(workspace.id)
-                        setOpenMenuId(null)
-                      }}
-                    >
-                      <Archive size={14} /> Archive
-                    </button>
-                    <button
-                      className="workspace-dropdown-item delete"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteWorkspace(e as MouseEvent<HTMLButtonElement>, workspace.id)
-                        setOpenMenuId(null)
-                      }}
-                    >
-                      <Trash2 size={14} /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-              <span className="workspace-title">{workspace.title}</span>
-              <div className="workspace-stats">
-                <span className="workspace-points">
-                  <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> {workspace.points} pts
-                </span>
-                <span className="workspace-progress-text">{workspace.progress}%</span>
-              </div>
-              <div className="workspace-progress-bar">
-                <div 
-                  className="workspace-progress-fill" 
-                  style={{ width: `${workspace.progress}%` }}
-                ></div>
-              </div>
-            </div>
-          ))}
+                  onArchive={handleArchiveWorkspace}
+                  onDelete={handleDeleteWorkspace}
+                  isDarkMode={isDarkMode}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* ARCHIVED SECTION */}
@@ -675,6 +831,16 @@ Description: ${currentWorkspace?.description || 'None'}`
                       <span className="subtask-points">
                         <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> +{subtask.points} pts
                       </span>
+                      <button
+                        className="subtask-delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSubtask(subtask.id)
+                        }}
+                        title="Delete subtask"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -704,6 +870,34 @@ Description: ${currentWorkspace?.description || 'None'}`
                 >
                   {calculateProgress(currentWorkspace) === 100 ? '✓ Task Completed' : '✓ Mark Task as Finished'}
                 </button>
+
+                {recentlyDeleted.length > 0 && (
+                  <div className="recently-deleted">
+                    <button
+                      className="recently-deleted-toggle"
+                      onClick={() => setShowRecentlyDeleted(!showRecentlyDeleted)}
+                    >
+                      <Trash2 size={13} />
+                      Recently Deleted ({recentlyDeleted.length})
+                      <span className="archived-chevron">{showRecentlyDeleted ? '▲' : '▼'}</span>
+                    </button>
+                    {showRecentlyDeleted && (
+                      <div className="recently-deleted-list">
+                        {recentlyDeleted.map((item, index) => (
+                          <div key={index} className="recently-deleted-item">
+                            <span className="recently-deleted-title">{item.subtask.title}</span>
+                            <button
+                              className="restore-btn"
+                              onClick={() => handleRestoreSubtask(index)}
+                            >
+                              Restore
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Activity Log */}
                 <div className="activity-log">
@@ -747,9 +941,7 @@ Description: ${currentWorkspace?.description || 'None'}`
           </div>
         )}
 
-        <div className="assistant-body" ref={(el) => {
-          if (el) el.scrollTop = el.scrollHeight
-        }}>
+        <div className="assistant-body" ref={assistantBodyRef}>
           {assistantMessages.map((msg, index) => (
             <div
               key={index}
@@ -759,7 +951,11 @@ Description: ${currentWorkspace?.description || 'None'}`
                 <div className="assistant-avatar">TQ</div>
               )}
               <div className="message-bubble">
-                {msg.content}
+                {msg.role === 'assistant' ? (
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                ) : (
+                  msg.content
+                )}
               </div>
             </div>
           ))}
@@ -787,12 +983,28 @@ Description: ${currentWorkspace?.description || 'None'}`
         </div>
 
         <div className="assistant-input">
-          <input
-            placeholder={ollamaRunning ? "Describe your task or answer the question..." : "Start Ollama to use AI..."}
+          <textarea
+            placeholder={ollamaRunning ? "Describe your task..." : "Start Ollama to use AI..."}
             value={assistantInput}
-            onChange={e => setAssistantInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAssistantSend()}
+            onChange={e => {
+              setAssistantInput(e.target.value)
+              e.target.style.height = '52px'
+              const newHeight = Math.min(e.target.scrollHeight, 350)
+              e.target.style.height = newHeight + 'px'
+              if (newHeight >= 350) {
+                e.target.classList.add('scrollable')
+              } else {
+                e.target.classList.remove('scrollable')
+              }
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleAssistantSend()
+              }
+            }}
             disabled={!ollamaRunning || isAILoading}
+            rows={2}
           />
           <button
             className="assistant-send-btn"
@@ -840,7 +1052,7 @@ Description: ${currentWorkspace?.description || 'None'}`
           <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>New Task / Project</h3>
-              <p>Minimal input now — details later.</p>
+              <p>Describe your task and let AI improve it.</p>
             </div>
 
             <form
@@ -849,20 +1061,49 @@ Description: ${currentWorkspace?.description || 'None'}`
                 e.preventDefault()
                 const fd = new FormData(e.currentTarget)
                 createWorkspace({
-                  title: String(fd.get('title') || ''),
-                  description: String(fd.get('description') || ''),
+                  title: modalTitle || String(fd.get('title') || ''),
+                  description: modalDescription || String(fd.get('description') || ''),
                   type: (fd.get('type') as 'task' | 'project') || 'task'
                 })
+                setModalTitle('')
+                setModalDescription('')
               }}
             >
               <label className="field">
-                <span>Title</span>
-                <input name="title" required placeholder="e.g., Fix memory leak" />
+                <span>Description (messy is OK)</span>
+                <div className="field-with-btn">
+                  <textarea
+                    name="description"
+                    rows={4}
+                    placeholder="Paste notes here... e.g. need to finish ml coursework, implement model, write report"
+                    value={modalDescription}
+                    onChange={(e) => setModalDescription(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className={`improve-ai-icon-btn ${isImprovingAI ? 'loading' : ''}`}
+                    onClick={handleImproveWithAI}
+                    disabled={!ollamaRunning || isImprovingAI || !modalDescription.trim()}
+                    title={ollamaRunning ? 'Improve with AI' : 'Start Ollama to use AI'}
+                  >
+                    <Sparkles size={15} />
+                  </button>
+                </div>
               </label>
 
+              {!ollamaRunning && (
+                <p className="improve-ai-warning">Start Ollama to use AI improvement</p>
+              )}
+
               <label className="field">
-                <span>Description (messy is OK)</span>
-                <textarea name="description" rows={4} placeholder="Paste notes here..." />
+                <span>Title</span>
+                <input
+                  name="title"
+                  required
+                  placeholder="e.g., Fix memory leak"
+                  value={modalTitle}
+                  onChange={(e) => setModalTitle(e.target.value)}
+                />
               </label>
 
               <label className="field">
@@ -874,7 +1115,15 @@ Description: ${currentWorkspace?.description || 'None'}`
               </label>
 
               <div className="modal-actions">
-                <button type="button" className="btn ghost" onClick={() => setIsCreateOpen(false)}>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    setIsCreateOpen(false)
+                    setModalTitle('')
+                    setModalDescription('')
+                  }}
+                >
                   Cancel
                 </button>
                 <button type="submit" className="btn primary">

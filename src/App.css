@@ -5,7 +5,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #f6f7fb;
+  background: #eef0f5;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
@@ -42,10 +42,10 @@ html, body, #root {
    ========================================================= */
 /* LEFT */
 .sidebar {
-  flex: 0 0 300px;
-  min-width: 300px;
-  max-width: 300px;
-  background: white;
+  flex: 0 0 280px;
+  min-width: 280px;
+  max-width: 280px;
+  background: #f0f1f8;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
@@ -215,7 +215,7 @@ html, body, #root {
 .center {
   flex: 1 1 auto;           /* always takes remaining space */
   min-width: 520px;         /* prevents ugly squish */
-  background: white;
+  background: #f5f6fa;
   overflow-y: auto;
 }
 
@@ -290,10 +290,10 @@ html, body, #root {
    ASSISTANT (RIGHT)
    ========================================================= */
 .assistant {
-  flex: 0 0 350px;
-  min-width: 350px;
-  max-width: 350px;
-  width: 350px;
+  flex: 0 0 380px;
+  min-width: 380px;
+  max-width: 380px;
+  width: 380px;
   background: #f8fafc;
   border-left: 1px solid #e2e8f0;
   display: flex;
@@ -377,18 +377,22 @@ html, body, #root {
 }
 
 .assistant-input {
-  padding: 14px;
+  padding: 10px 14px;
   border-top: 1px solid #e2e8f0;
   background: white;
-  display: grid;
-  grid-template-columns: 1fr 44px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
   gap: 10px;
 }
 
-.assistant-input input {
-  padding: 12px;
+.assistant-input textarea {
+  padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .assistant-send-btn {
@@ -660,7 +664,8 @@ html, body, #root {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 6px;
 }
 
 .subtask-item:hover {
@@ -669,10 +674,9 @@ html, body, #root {
   transform: translateX(3px);
 }
 
-.subtask-item.completed:hover {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #666;
+.subtask-item.completed {
+  opacity: 0.6;
+  background: #f8fafc;
 }
 
 .subtask-delete-btn {
@@ -907,7 +911,7 @@ html, body, #root {
   gap: 8px;
 }
 
-.assistant-input input {
+.assistant-input textarea {
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 10px;
@@ -1680,11 +1684,12 @@ html, body, #root {
 
 /* Assistant input */
 .assistant-input {
-  padding: 14px;
+  padding: 10px 14px;
   border-top: 1px solid #e2e8f0;
   background: white;
-  display: grid;
-  grid-template-columns: 1fr 44px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
   gap: 10px;
 }
 
@@ -1693,8 +1698,8 @@ html, body, #root {
   border-color: #334155;
 }
 
-.assistant-input input {
-  padding: 12px;
+.assistant-input textarea {
+  padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   font-size: 13px;
@@ -1702,19 +1707,58 @@ html, body, #root {
   background: white;
   color: #0f172a;
   outline: none;
+  line-height: 1.6;
+  height: 52px;
+  min-height: 52px;
+  max-height: 350px;
+  overflow-y: hidden;
+  resize: none;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.assistant-input input:focus {
+.assistant-input textarea.scrollable {
+  overflow-y: scroll;
+}
+
+.assistant-input textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.assistant-input textarea::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px;
+}
+
+.assistant-input textarea::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.assistant-input textarea::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: padding-box;
+}
+
+.assistant-input textarea:focus {
   border-color: #6366f1;
 }
 
-.dark .assistant-input input {
+.dark .assistant-input textarea {
   background: #0f172a;
   border-color: #334155;
   color: #e2e8f0;
 }
 
-.dark .assistant-input input:focus {
+.dark .assistant-input textarea::-webkit-scrollbar-thumb {
+  background: #334155;
+  background-clip: padding-box;
+}
+
+.dark .assistant-input textarea:focus {
   border-color: #f97316;
 }
 
@@ -1979,8 +2023,8 @@ html, body, #root {
 }
 
 .dark .subtask-item {
-  background: #1e293b;
-  border-color: transparent;
+  background: #273549;
+  border: 1px solid #334155;
 }
 
 .dark .subtask-item:hover {
@@ -1989,9 +2033,10 @@ html, body, #root {
   transform: translateX(3px);
 }
 
-.dark .subtask-item.completed:hover {
-  background: #052e16;
-  border-color: #166534;
+.dark .subtask-item.completed {
+  background: #1a2535;
+  border-color: #2d3f55;
+  opacity: 0.7;
 }
 
 .dark .subtask-title {
@@ -2055,7 +2100,7 @@ html, body, #root {
   border-color: #334155;
 }
 
-.dark .assistant-input input {
+.dark .assistant-input textarea {
   background: #0f172a;
   border-color: #334155;
   color: #e2e8f0;
@@ -2132,4 +2177,162 @@ html, body, #root {
 
 .dark .progress-fill {
   background: #f97316;
+}
+
+/* =========================================================
+   IMPROVE WITH AI BUTTON
+   ========================================================= */
+.field-with-btn {
+  position: relative;
+}
+
+.field-with-btn textarea {
+  width: 100%;
+  padding: 12px 48px 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  color: #0f172a;
+  transition: border-color 0.2s;
+  resize: none;
+  min-height: 100px;
+  box-sizing: border-box;
+}
+
+.field-with-btn textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.dark .field-with-btn textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark .field-with-btn textarea:focus {
+  border-color: #f97316;
+}
+
+.improve-ai-icon-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #6366f1;
+  background: #eef2ff;
+  color: #6366f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.improve-ai-icon-btn:hover:not(:disabled) {
+  background: #6366f1;
+  color: white;
+}
+
+.improve-ai-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.improve-ai-icon-btn.loading {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.improve-ai-warning {
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+  margin: 0;
+}
+
+.dark .improve-ai-icon-btn {
+  background: #1c1008;
+  border-color: #f97316;
+  color: #f97316;
+}
+
+.dark .improve-ai-icon-btn:hover:not(:disabled) {
+  background: #f97316;
+  color: white;
+}
+
+/* =========================================================
+   MARKDOWN RENDERING IN CHAT
+   ========================================================= */
+.message-bubble p {
+  margin: 0 0 1px 0;
+  line-height: 1.3;
+}
+
+.message-bubble p:last-child {
+  margin: 0;
+}
+
+.message-bubble strong {
+  font-weight: 700;
+}
+
+.message-bubble ul,
+.message-bubble ol {
+  margin: -14px 0 0;
+  padding-left: 12px;
+}
+
+.message-bubble li {
+  margin-bottom: -16px;
+  line-height: 1.2;
+  padding: 0;
+}
+
+.message-bubble li p {
+  margin: 0;
+}
+
+.message-bubble h1,
+.message-bubble h2,
+.message-bubble h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 1px 0 -22px;
+  line-height: 1.1;
+}
+
+.message-bubble code {
+  background: rgba(0,0,0,0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.message-bubble pre {
+  background: rgba(0,0,0,0.15);
+  padding: 8px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 11px;
+  margin: 4px 0;
+}
+
+.dark .message-bubble code {
+  background: rgba(255,255,255,0.1);
+}
+
+.dark .message-bubble pre {
+  background: rgba(255,255,255,0.05);
 }

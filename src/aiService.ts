@@ -116,3 +116,45 @@ Rules:
 
   return await sendToAI(messages)
 }
+
+export async function improveTaskDescription(
+  description: string
+): Promise<{ title: string; description: string }> {
+
+  const systemPrompt = `You are TaskQuest AI assistant. Your job is to take rough, messy task notes and turn them into a clean title and description.
+
+Rules:
+- Generate a short, clear title (max 6 words)
+- Clean up the description into 1-2 clear sentences
+- Keep the meaning the same, just make it cleaner
+- Do not add extra information that wasn't there
+
+Respond in this exact JSON format:
+{
+  "title": "Clean task title here",
+  "description": "Clean description here"
+}
+
+Only respond with the JSON. No other text.`
+
+  const messages: Message[] = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Improve this task:\n\n${description}` }
+  ]
+
+  const response = await sendToAI(messages)
+
+  try {
+    const cleaned = response.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(cleaned)
+    return {
+      title: parsed.title || '',
+      description: parsed.description || ''
+    }
+  } catch {
+    return {
+      title: '',
+      description: description
+    }
+  }
+}
