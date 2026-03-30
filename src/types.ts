@@ -5,6 +5,7 @@ export interface Subtask {
   title: string
   done: boolean
   points: number
+  dependsOn?: number[]
 }
 
 export interface AssistantMessage {
