@@ -28,7 +28,16 @@ import ReactMarkdown from 'react-markdown'
 import './App.css'
 import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles } from 'lucide-react'
 import { Workspace, Subtask, AssistantMessage } from './types'
-import { checkOllamaRunning, generateSubtasks, improveTaskDescription } from './aiService'
+import {
+  checkOllamaRunning,
+  generateSubtasks,
+  improveTaskDescription,
+  sendGreeting,
+  sendQuestioningMessage,
+  sendPlanningMessage,
+  sendExecutionMessage,
+  sendReviewMessage
+} from './aiService'
 import { extractDocumentText, truncateDocument } from './documentParser'
 
 function SortableWorkspaceItem({
@@ -201,9 +210,26 @@ export default function App() {
   const [modalDescription, setModalDescription] = useState('')
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
-  const [chatHistories, setChatHistories] = useState<Record<number, AssistantMessage[]>>({})
+  const [chatHistories, setChatHistories] = useState<Record<number, AssistantMessage[]>>(() => {
+    try {
+      const saved = localStorage.getItem('chatHistories')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
   const [assistantInput, setAssistantInput] = useState('')
-  const [assistantMode, setAssistantMode] = useState<'questioning' | 'planning' | 'execution' | 'review'>('questioning')
+  const [workspaceModes, setWorkspaceModes] = useState<Record<number, 'questioning' | 'planning' | 'execution' | 'review'>>({})
+  const [planningStage, setPlanningStage] = useState<Record<number, 'summary' | 'generate'>>({})
+
+  const assistantMode = selectedWorkspaceId
+    ? (workspaceModes[selectedWorkspaceId] || 'questioning')
+    : 'questioning'
+
+  const setAssistantMode = (mode: 'questioning' | 'planning' | 'execution' | 'review') => {
+    if (!selectedWorkspaceId) return
+    setWorkspaceModes(prev => ({ ...prev, [selectedWorkspaceId]: mode }))
+  }
   const assistantMessages = chatHistories[selectedWorkspaceId] || []
 
   const setAssistantMessages = (updater: AssistantMessage[] | ((prev: AssistantMessage[]) => AssistantMessage[])) => {
@@ -214,6 +240,9 @@ export default function App() {
     })
   }
   const [isAILoading, setIsAILoading] = useState(false)
+  const [planningTabPulse, setPlanningTabPulse] = useState(false)
+  const [reviewTabPulse, setReviewTabPulse] = useState(false)
+  const completionMessageSent = useRef<Record<number, boolean>>({})
   const [ollamaRunning, setOllamaRunning] = useState<boolean | null>(null)
   const [uploadedDocument, setUploadedDocument] = useState<string>('')
   const [uploadedFileName, setUploadedFileName] = useState<string>('')
@@ -250,6 +279,10 @@ export default function App() {
   }, [workspaces])
 
   useEffect(() => {
+    localStorage.setItem('chatHistories', JSON.stringify(chatHistories))
+  }, [chatHistories])
+
+  useEffect(() => {
     localStorage.setItem('archivedWorkspaces', JSON.stringify(archivedWorkspaces))
   }, [archivedWorkspaces])
 
@@ -270,20 +303,18 @@ export default function App() {
 
     const generateGreeting = async () => {
       try {
-        const { getGreetingPrompt, sendToAI } = await import('./aiService')
-        const greeting = await sendToAI([
-          { role: 'system', content: getGreetingPrompt(workspace.title, workspace.description) },
-          { role: 'user', content: 'hello' }
-        ])
+        const greeting = await sendGreeting(workspace.title, workspace.description)
         setChatHistories(prev => ({
           ...prev,
           [selectedWorkspaceId]: [{ role: 'assistant', content: greeting }]
         }))
       } catch {
-        // fallback to default message
         setChatHistories(prev => ({
           ...prev,
-          [selectedWorkspaceId]: [{ role: 'assistant', content: `Hi! I'm your TaskQuest AI assistant. How can I help you with your task today?` }]
+          [selectedWorkspaceId]: [{
+            role: 'assistant',
+            content: `Hi! I see you're working on "${workspace.title}". What would you like to clarify before we plan this out?`
+          }]
         }))
       }
     }
@@ -378,12 +409,33 @@ export default function App() {
           if (completedCount > 0 && completedCount % 3 === 0) {
             setTimeout(() => {
               showNotification(` You're on a streak! +100 bonus points`);
-              setWorkspaces(prev => prev.map(w => 
-                w.id === selectedWorkspaceId 
+              setWorkspaces(prev => prev.map(w =>
+                w.id === selectedWorkspaceId
                   ? { ...w, points: w.points + 100 }
                   : w
               ));
             }, 1500);
+          }
+
+          // Check if all subtasks are now done
+          const allDone = updatedSubtasks.every(s => s.done)
+          if (allDone && updatedSubtasks.length > 0 && !completionMessageSent.current[workspace.id]) {
+            completionMessageSent.current[workspace.id] = true
+            setReviewTabPulse(true)
+            setChatHistories(prev => {
+              const current = prev[workspace.id] || []
+              return {
+                ...prev,
+                [workspace.id]: [...current, {
+                  role: 'assistant',
+                  content: `You've completed all subtasks for "${workspace.title}" — great work! Switch to the REVIEW tab whenever you're ready to reflect on what you built.`
+                }]
+              }
+            })
+          }
+
+          if (!allDone) {
+            completionMessageSent.current[workspace.id] = false
           }
         }
 
@@ -443,6 +495,17 @@ export default function App() {
     if (workspaces.length === 1) return;
     const remaining = workspaces.filter(w => w.id !== workspaceId);
     setWorkspaces(remaining);
+    setChatHistories(prev => {
+      const updated = { ...prev }
+      delete updated[workspaceId]
+      return updated
+    })
+    setPlanningStage(prev => {
+      const updated = { ...prev }
+      delete updated[workspaceId]
+      return updated
+    })
+    completionMessageSent.current[workspaceId] = false
     if (selectedWorkspaceId === workspaceId) {
       setSelectedWorkspaceId(remaining[0].id);
     }
@@ -496,7 +559,6 @@ export default function App() {
           return
         }
 
-        const { sendQuestioningMessage } = await import('./aiService')
         const response = await sendQuestioningMessage(
           currentWorkspace.title,
           currentWorkspace.description,
@@ -508,62 +570,86 @@ export default function App() {
           content: response
         }])
 
+        if (response.toLowerCase().includes('planning tab')) {
+          setTimeout(() => {
+            setAssistantMode('planning')
+            setPlanningTabPulse(false)
+          }, 1000)
+        }
+
       } else if (assistantMode === 'planning') {
         if (!currentWorkspace) return
 
-        setAssistantMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'Generating your subtasks...'
-        }])
-
-        const conversationSummary = assistantMessages
+        const conversationSummary = chatHistories[currentWorkspace.id]
+          ?.filter(m => m.role === 'user')
           .map(m => m.content)
           .join(' ')
-          .slice(0, 500)
+          .slice(0, 800) || ''
 
-        const result = await generateSubtasks(
-          currentWorkspace.title,
-          currentWorkspace.description,
-          conversationSummary,
-          undefined,
-          uploadedDocument || undefined
-        )
+        const currentPlanningStage = planningStage[currentWorkspace.id] || 'summary'
 
-        if (result.subtasks.length > 0) {
-          const newSubtasks: Subtask[] = result.subtasks.map((s, index) => ({
-            id: Date.now() + index,
-            title: s.title,
-            done: false,
-            points: s.points
-          }))
+        if (currentPlanningStage === 'summary') {
+          // Stage 1 — show vision summary
+          const summary = await sendPlanningMessage(
+            currentWorkspace.title,
+            currentWorkspace.description,
+            conversationSummary,
+            [...conversationHistory, { role: 'user' as const, content: userMessage }]
+          )
+          const cleanSummary = summary.replace(/```json[\s\S]*?```/g, '').replace(/\{[\s\S]*\}/g, '').trim()
+          setAssistantMessages(prev => [...prev, { role: 'assistant', content: cleanSummary }])
+          setPlanningStage(prev => ({ ...prev, [currentWorkspace.id]: 'generate' }))
 
-          updateWorkspace(currentWorkspace.id, {
-            subtasks: [...currentWorkspace.subtasks, ...newSubtasks]
-          })
-
-          setAssistantMessages(prev => [
-            ...prev.slice(0, -1),
-            {
-              role: 'assistant',
-              content: `I've created ${result.subtasks.length} subtasks for you (${result.totalPoints} pts total).\n\n${result.reasoning}\n\nYou can see them in the Execution Plan. Ask me if you need any guidance along the way.`
-            }
-          ])
-
-          setAssistantMode('execution')
         } else {
-          setAssistantMessages(prev => [
-            ...prev.slice(0, -1),
-            {
-              role: 'assistant',
-              content: 'I had trouble generating subtasks. Could you give me a bit more detail about what needs to be done?'
-            }
-          ])
+          // Stage 2 — generate subtasks
+          setAssistantMessages(prev => [...prev, {
+            role: 'assistant',
+            content: 'Generating your subtasks...'
+          }])
+
+          const result = await generateSubtasks(
+            currentWorkspace.title,
+            currentWorkspace.description,
+            conversationSummary,
+            undefined,
+            uploadedDocument || undefined
+          )
+
+          if (result.subtasks.length > 0) {
+            const newSubtasks: Subtask[] = result.subtasks.map((s, index) => ({
+              id: Date.now() + index,
+              title: s.title,
+              done: false,
+              points: s.points,
+              dependsOn: s.dependsOn || []
+            }))
+
+            updateWorkspace(currentWorkspace.id, {
+              subtasks: [...currentWorkspace.subtasks, ...newSubtasks]
+            })
+
+            setAssistantMessages(prev => [
+              ...prev.slice(0, -1),
+              {
+                role: 'assistant',
+                content: `I've created ${result.subtasks.length} subtasks for you (${result.totalPoints} pts total).\n\n${result.reasoning}\n\nYou can see them in the Execution Plan. Ask me anything as you work through them.`
+              }
+            ])
+
+            setAssistantMode('execution')
+          } else {
+            setAssistantMessages(prev => [
+              ...prev.slice(0, -1),
+              {
+                role: 'assistant',
+                content: 'I had trouble generating subtasks. Could you give me a bit more detail?'
+              }
+            ])
+          }
         }
 
       } else if (assistantMode === 'execution') {
         if (!currentWorkspace) return
-
-        const { sendExecutionMessage } = await import('./aiService')
 
         const completedSubtasks = currentWorkspace.subtasks
           .filter(s => s.done)
@@ -587,8 +673,6 @@ export default function App() {
 
       } else if (assistantMode === 'review') {
         if (!currentWorkspace) return
-
-        const { sendReviewMessage } = await import('./aiService')
 
         const completedSubtasks = currentWorkspace.subtasks
           .filter(s => s.done)
@@ -712,6 +796,22 @@ export default function App() {
   // - Add subtasks + points system
   // - Save/load from disk (Electron FS)
   // ===============================
+
+  const handleModeSwitch = (mode: 'questioning' | 'planning' | 'execution' | 'review') => {
+    if (!currentWorkspace || mode === assistantMode) return
+    setAssistantMode(mode)
+
+    const phaseMessages: Record<string, string> = {
+      planning: `Ready to plan! Based on our conversation I have everything I need. Type anything to generate your subtasks for "${currentWorkspace.title}".`,
+      execution: `Let's get to work! Your execution plan is ready. Start with the first subtask and ask me if you need any guidance.`,
+      questioning: `Back to questioning mode. What would you like to clarify about "${currentWorkspace.title}"?`
+    }
+
+    const message = phaseMessages[mode]
+    if (message) {
+      setAssistantMessages(prev => [...prev, { role: 'assistant', content: message }])
+    }
+  }
 
   return (
     <div className={`app ${isDarkMode ? 'dark' : ''}`}>
@@ -1007,16 +1107,34 @@ export default function App() {
         <div className="assistant-header">
           <div className="assistant-title">Task Assistant</div>
           <div className="modes">
-            {(['questioning', 'planning', 'execution', 'review'] as const).map(mode => (
-              <span
-                key={mode}
-                className={`mode ${assistantMode === mode ? 'active' : ''}`}
-                onClick={() => setAssistantMode(mode)}
-                style={{ cursor: 'pointer' }}
-              >
-                {mode.toUpperCase()}
-              </span>
-            ))}
+            <span
+              className={`mode ${assistantMode === 'questioning' ? 'active' : ''}`}
+              onClick={() => handleModeSwitch('questioning')}
+              style={{ cursor: 'pointer' }}
+            >
+              QUESTIONING
+            </span>
+            <span
+              className={`mode ${assistantMode === 'planning' ? 'active' : ''} ${planningTabPulse ? 'pulse-tab' : ''}`}
+              onClick={() => { handleModeSwitch('planning'); setPlanningTabPulse(false) }}
+              style={{ cursor: 'pointer' }}
+            >
+              PLANNING
+            </span>
+            <span
+              className={`mode ${assistantMode === 'execution' ? 'active' : ''}`}
+              onClick={() => handleModeSwitch('execution')}
+              style={{ cursor: 'pointer' }}
+            >
+              EXECUTION
+            </span>
+            <span
+              className={`mode ${assistantMode === 'review' ? 'active' : ''} ${reviewTabPulse ? 'pulse-tab' : ''}`}
+              onClick={() => { handleModeSwitch('review'); setReviewTabPulse(false) }}
+              style={{ cursor: 'pointer' }}
+            >
+              REVIEW
+            </span>
           </div>
         </div>
 
