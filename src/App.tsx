@@ -6,7 +6,7 @@
 // Right = Assistant panel (UI only for now)
 // ===============================
 
-import { useState, useEffect, useRef, type MouseEvent } from 'react'
+import { useState, useEffect, useRef, type MouseEvent, type RefObject } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -26,7 +26,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
-import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles } from 'lucide-react'
+import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles, Lock } from 'lucide-react'
 import { Workspace, Subtask, AssistantMessage } from './types'
 import {
   checkOllamaRunning,
@@ -44,6 +44,7 @@ function SortableWorkspaceItem({
   workspace,
   isSelected,
   openMenuId,
+  workspaceMenuRef,
   onSelect,
   onMenuToggle,
   onArchive,
@@ -53,6 +54,7 @@ function SortableWorkspaceItem({
   workspace: Workspace
   isSelected: boolean
   openMenuId: number | null
+  workspaceMenuRef?: RefObject<HTMLDivElement | null>
   onSelect: (id: number) => void
   onMenuToggle: (e: React.MouseEvent, id: number) => void
   onArchive: (id: number) => void
@@ -83,7 +85,7 @@ function SortableWorkspaceItem({
       className={`workspace-item ${workspace.type} ${isSelected ? 'selected' : ''}`}
       onClick={() => onSelect(workspace.id)}
     >
-      <div className="workspace-header">
+      <div className="workspace-header" ref={openMenuId === workspace.id ? workspaceMenuRef : undefined}>
         <span className="workspace-type">{workspace.type.toUpperCase()}</span>
         <button
           className="workspace-menu-btn"
@@ -264,6 +266,7 @@ export default function App() {
     return localStorage.getItem('darkMode') === 'true'
   })
   const assistantBodyRef = useRef<HTMLDivElement | null>(null)
+  const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
 
   const toggleDarkMode = () => {
     setIsDarkMode(prev => {
@@ -290,6 +293,20 @@ export default function App() {
     checkOllamaRunning().then(running => {
       setOllamaRunning(running)
     })
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutsideMenu = (event: globalThis.MouseEvent) => {
+      if (!workspaceMenuRef.current) return
+      if (!workspaceMenuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutsideMenu)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideMenu)
+    }
   }, [])
 
   // When selectedWorkspaceId changes and chat is empty, generate greeting
@@ -464,6 +481,15 @@ export default function App() {
     showNotification(`🎉 Task completed! You earned ${totalSubtaskPoints} points!`);
     setShowArchiveModal(true);
   };
+
+  const isSubtaskLocked = (subtask: Subtask, allSubtasks: Subtask[]): boolean => {
+    if (!subtask.dependsOn || subtask.dependsOn.length === 0) return false
+    return subtask.dependsOn.some(depIndex => {
+      const depSubtask = allSubtasks[depIndex]
+      if (!depSubtask) return false
+      return !depSubtask.done
+    })
+  }
 
   const handleArchiveWorkspace = (workspaceId: number) => {
     const workspace = workspaces.find(w => w.id === workspaceId)
@@ -872,6 +898,7 @@ export default function App() {
                   workspace={workspace}
                   isSelected={selectedWorkspaceId === workspace.id}
                   openMenuId={openMenuId}
+                  workspaceMenuRef={workspaceMenuRef}
                   onSelect={handleSelectWorkspace}
                   onMenuToggle={(e, id) => {
                     e.stopPropagation()
@@ -998,36 +1025,53 @@ export default function App() {
 
                 {/* Subtasks list */}
                 <div className="subtasks-list">
-                  {currentWorkspace.subtasks.map((subtask) => (
-                    <div
-                      key={subtask.id}
-                      className={`subtask-item ${subtask.done ? 'completed' : ''}`}
-                      onClick={() => handleToggleSubtask(subtask.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={subtask.done}
-                        onChange={() => handleToggleSubtask(subtask.id)}
-                        className="subtask-checkbox"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <span className="subtask-title">{subtask.title}</span>
-                      <span className="subtask-points">
-                        <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> +{subtask.points} pts
-                      </span>
-                      <button
-                        className="subtask-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteSubtask(subtask.id)
+                  {currentWorkspace.subtasks.map((subtask) => {
+                    const locked = isSubtaskLocked(subtask, currentWorkspace.subtasks)
+                    return (
+                      <div
+                        key={subtask.id}
+                        className={`subtask-item ${subtask.done ? 'completed' : ''} ${locked && !subtask.done ? 'locked' : ''}`}
+                        onClick={() => {
+                          if (subtask.done) {
+                            handleToggleSubtask(subtask.id)
+                          } else if (!locked) {
+                            handleToggleSubtask(subtask.id)
+                          }
                         }}
-                        title="Delete subtask"
+                        style={{ cursor: locked && !subtask.done ? 'not-allowed' : 'pointer' }}
                       >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
+                        <input
+                          type="checkbox"
+                          checked={subtask.done}
+                          disabled={locked && !subtask.done}
+                          onChange={() => {
+                            if (subtask.done || !locked) {
+                              handleToggleSubtask(subtask.id)
+                            }
+                          }}
+                          className="subtask-checkbox"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className={`subtask-title ${locked ? 'locked-title' : ''}`}>
+                          {locked && <Lock size={12} className="lock-icon" />}
+                          {subtask.title}
+                        </span>
+                        <span className="subtask-points">
+                          <DiamondIcon size={11} color={isDarkMode ? '#a855f7' : '#f97316'} /> +{subtask.points} pts
+                        </span>
+                        <button
+                          className="subtask-delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteSubtask(subtask.id)
+                          }}
+                          title="Delete subtask"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* Input row */}
