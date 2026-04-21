@@ -26,7 +26,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
-import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles, Lock } from 'lucide-react'
+import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles, Lock, ChevronRight } from 'lucide-react'
+import ExecutionPlan from './ExecutionPlan'
 import { Workspace, Subtask, AssistantMessage } from './types'
 import {
   checkOllamaRunning,
@@ -39,6 +40,31 @@ import {
   sendReviewMessage
 } from './aiService'
 import { extractDocumentText, truncateDocument } from './documentParser'
+
+function useCountUp(target: number, duration: number = 600) {
+  const [display, setDisplay] = useState(target)
+  const prev = useRef(target)
+
+  useEffect(() => {
+    if (prev.current === target) return
+    const start = prev.current
+    const diff = target - start
+    const startTime = Date.now()
+
+    const tick = () => {
+      const elapsed = Date.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(start + diff * eased))
+      if (progress < 1) requestAnimationFrame(tick)
+      else prev.current = target
+    }
+
+    requestAnimationFrame(tick)
+  }, [target, duration])
+
+  return display
+}
 
 function SortableWorkspaceItem({
   workspace,
@@ -54,7 +80,7 @@ function SortableWorkspaceItem({
   workspace: Workspace
   isSelected: boolean
   openMenuId: number | null
-  workspaceMenuRef?: RefObject<HTMLDivElement | null>
+  workspaceMenuRef?: RefObject<HTMLDivElement>
   onSelect: (id: number) => void
   onMenuToggle: (e: React.MouseEvent, id: number) => void
   onArchive: (id: number) => void
@@ -265,6 +291,10 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('darkMode') === 'true'
   })
+  const [centerFading, setCenterFading] = useState(false)
+  const [completingId, setCompletingId] = useState<number | null>(null)
+  const [visualMode, setVisualMode] = useState(true)
+  const [assistantCollapsed, setAssistantCollapsed] = useState(false)
   const assistantBodyRef = useRef<HTMLDivElement | null>(null)
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -353,6 +383,7 @@ export default function App() {
 
   // Calculate total points across all workspaces
   const totalOverallPoints = workspaces.reduce((sum, w) => sum + w.points, 0);
+  const displayPoints = useCountUp(totalOverallPoints)
 
   // Calculate progress for a workspace
   const calculateProgress = (workspace: Workspace) => {
@@ -385,7 +416,7 @@ export default function App() {
       id: Date.now(),
       title: newSubtaskTitle,
       done: false,
-      points: 50
+      points: 5
     };
     
     const updatedSubtasks = [...(currentWorkspace.subtasks || []), newSubtask];
@@ -393,12 +424,14 @@ export default function App() {
     setNewSubtaskTitle("");
   };
 
-  const handleToggleSubtask = (subtaskId: number) => {
+  const handleToggleSubtask = (workspaceId: number, subtaskId: number) => {
+    setCompletingId(subtaskId)
+    setTimeout(() => setCompletingId(null), 500)
     if (!currentWorkspace) return;
 
     setWorkspaces(prevWorkspaces => {
       return prevWorkspaces.map(workspace => {
-        if (workspace.id !== selectedWorkspaceId) return workspace;
+        if (workspace.id !== workspaceId) return workspace;
 
         // Find the subtask
         const subtask = workspace.subtasks.find(s => s.id === subtaskId);
@@ -427,7 +460,7 @@ export default function App() {
             setTimeout(() => {
               showNotification(` You're on a streak! +100 bonus points`);
               setWorkspaces(prev => prev.map(w =>
-                w.id === selectedWorkspaceId
+                w.id === workspaceId
                   ? { ...w, points: w.points + 100 }
                   : w
               ));
@@ -610,7 +643,7 @@ export default function App() {
           ?.filter(m => m.role === 'user')
           .map(m => m.content)
           .join(' ')
-          .slice(0, 800) || ''
+          .slice(0, 400) || ''
 
         const currentPlanningStage = planningStage[currentWorkspace.id] || 'summary'
 
@@ -633,13 +666,27 @@ export default function App() {
             content: 'Generating your subtasks...'
           }])
 
-          const result = await generateSubtasks(
+          let result = await generateSubtasks(
             currentWorkspace.title,
             currentWorkspace.description,
             conversationSummary,
             undefined,
             uploadedDocument || undefined
           )
+
+          if (result.subtasks.length === 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            const retry = await generateSubtasks(
+              currentWorkspace.title,
+              currentWorkspace.description,
+              conversationSummary,
+              undefined,
+              uploadedDocument || undefined
+            )
+            if (retry.subtasks.length > 0) {
+              result = retry
+            }
+          }
 
           if (result.subtasks.length > 0) {
             const newSubtasks: Subtask[] = result.subtasks.map((s, index) => ({
@@ -789,8 +836,13 @@ export default function App() {
   }
 
   const handleSelectWorkspace = (workspaceId: number) => {
-    setSelectedWorkspaceId(workspaceId);
-    setNewSubtaskTitle(""); // Clear input when switching
+    if (workspaceId === selectedWorkspaceId) return
+    setCenterFading(true)
+    setTimeout(() => {
+      setSelectedWorkspaceId(workspaceId)
+      setNewSubtaskTitle("")
+      setCenterFading(false)
+    }, 150)
   };
 
   // ===============================
@@ -840,7 +892,7 @@ export default function App() {
   }
 
   return (
-    <div className={`app ${isDarkMode ? 'dark' : ''}`}>
+    <div className={`app app-layout ${isDarkMode ? 'dark' : ''} ${assistantCollapsed ? 'assistant-collapsed' : ''}`}>
       {/* =======================================================
           LEFT PANEL (SIDEBAR): Workspaces list + Add button
           ======================================================= */}
@@ -875,7 +927,7 @@ export default function App() {
         {/* Overall points display */}
         <div className="overall-points">
           <DiamondIcon size={28} color={isDarkMode ? '#a855f7' : '#f97316'} />
-          <span className="points-value">{totalOverallPoints}</span>
+          <span className="points-value">{displayPoints}</span>
           <span className="points-label">Total Points</span>
         </div>
 
@@ -971,7 +1023,7 @@ export default function App() {
           MIDDLE PANEL (CENTER): Selected workspace view
           ======================================================= */}
 
-      <main className="center">
+      <main className={`center center-panel ${centerFading ? 'fading' : ''}`}>
         {currentWorkspace ? (
           <>
             <div className="center-header">
@@ -1010,32 +1062,42 @@ export default function App() {
 
                 {/* Header */}
                 <div className="execution-header">
-                  <h2>Execution Plan</h2>
-                  {currentWorkspace.subtasks.length === 0 && (
-                    <span className="no-subtasks-pill">No subtasks yet</span>
-                  )}
+                  <span className="execution-title">Execution Plan</span>
+                  <button
+                    className="view-toggle-btn"
+                    onClick={() => setVisualMode(prev => !prev)}
+                  >
+                    {visualMode ? 'List View' : 'Visual View'}
+                  </button>
                 </div>
 
                 <div className="execution-divider" />
 
                 {/* Empty state */}
-                {currentWorkspace.subtasks.length === 0 && (
+                {!visualMode && currentWorkspace.subtasks.length === 0 && (
                   <p className="execution-empty">No subtasks added yet — add one below.</p>
                 )}
 
                 {/* Subtasks list */}
-                <div className="subtasks-list">
+                {visualMode ? (
+                  <ExecutionPlan
+                    subtasks={currentWorkspace.subtasks}
+                    onToggle={(id) => handleToggleSubtask(currentWorkspace.id, id)}
+                    isDarkMode={isDarkMode}
+                  />
+                ) : (
+                  <div className="subtasks-list">
                   {currentWorkspace.subtasks.map((subtask) => {
                     const locked = isSubtaskLocked(subtask, currentWorkspace.subtasks)
                     return (
                       <div
                         key={subtask.id}
-                        className={`subtask-item ${subtask.done ? 'completed' : ''} ${locked && !subtask.done ? 'locked' : ''}`}
+                        className={`subtask-item ${subtask.done ? 'completed' : ''} ${completingId === subtask.id ? 'completing' : ''} ${locked && !subtask.done ? 'locked' : ''}`}
                         onClick={() => {
                           if (subtask.done) {
-                            handleToggleSubtask(subtask.id)
+                            handleToggleSubtask(currentWorkspace.id, subtask.id)
                           } else if (!locked) {
-                            handleToggleSubtask(subtask.id)
+                            handleToggleSubtask(currentWorkspace.id, subtask.id)
                           }
                         }}
                         style={{ cursor: locked && !subtask.done ? 'not-allowed' : 'pointer' }}
@@ -1046,7 +1108,7 @@ export default function App() {
                           disabled={locked && !subtask.done}
                           onChange={() => {
                             if (subtask.done || !locked) {
-                              handleToggleSubtask(subtask.id)
+                              handleToggleSubtask(currentWorkspace.id, subtask.id)
                             }
                           }}
                           className="subtask-checkbox"
@@ -1072,7 +1134,8 @@ export default function App() {
                       </div>
                     )
                   })}
-                </div>
+                  </div>
+                )}
 
                 {/* Input row */}
                 <div className="execution-input-row">
@@ -1147,7 +1210,15 @@ export default function App() {
         )}
       </main>
 
-      <aside className="assistant">
+      <aside className={`assistant assistant-panel ${assistantCollapsed ? 'collapsed' : ''}`}>
+        <button
+          className="assistant-toggle-btn"
+          onClick={() => setAssistantCollapsed(prev => !prev)}
+        >
+          <ChevronRight size={14} />
+        </button>
+
+        <div className="assistant-content">
         <div className="assistant-header">
           <div className="assistant-title">Task Assistant</div>
           <div className="modes">
@@ -1210,8 +1281,8 @@ export default function App() {
           {isAILoading && (
             <div className="chat-message assistant-message">
               <div className="assistant-avatar">TQ</div>
-              <div className="message-bubble loading-bubble">
-                <span className="dot" /><span className="dot" /><span className="dot" />
+              <div className="message-bubble ai-loading-dots">
+                <span /><span /><span />
               </div>
             </div>
           )}
@@ -1261,6 +1332,8 @@ export default function App() {
             <ArrowUp size={18} />
           </button>
         </div>
+        </div>
+
       </aside>
 
       {/* ARCHIVE MODAL */}
