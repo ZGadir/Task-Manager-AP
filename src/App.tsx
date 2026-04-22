@@ -274,6 +274,15 @@ export default function App() {
     })
   }
   const [isAILoading, setIsAILoading] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
+
+  useEffect(() => {
+    if (!showSplash) return
+    const timer = setTimeout(() => {
+      setShowSplash(false)
+    }, 2500)
+    return () => clearTimeout(timer)
+  }, [showSplash])
   const [bonusChallenges, setBonusChallenges] = useState<Record<number, { title: string; reason: string; subtaskTitle: string }[]>>({})
   const [loadingBonuses, setLoadingBonuses] = useState(false)
   const [planningTabPulse, setPlanningTabPulse] = useState(false)
@@ -930,6 +939,16 @@ export default function App() {
 
   return (
     <div className={`app app-layout ${isDarkMode ? 'dark' : ''} ${assistantCollapsed ? 'assistant-collapsed' : ''}`}>
+      {showSplash && (
+        <div className="splash-screen">
+          <div className="splash-content">
+            <img src="/logo-orange.svg" alt="TaskQuest" className="splash-logo" />
+            <h1 className="splash-title">TaskQuest</h1>
+            <p className="splash-subtitle">Plan smarter. Learn deeper. Achieve more.</p>
+          </div>
+        </div>
+      )}
+
       {/* =======================================================
           LEFT PANEL (SIDEBAR): Workspaces list + Add button
           ======================================================= */}
