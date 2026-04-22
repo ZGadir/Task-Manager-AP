@@ -5,3 +5,5 @@ build
 .env
 *.exe
 *.zip
+.claude/
+CONTEXT.md

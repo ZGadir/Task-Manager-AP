@@ -1,4 +1,4 @@
-import { Check, Lock } from 'lucide-react'
+import { Check, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Subtask } from './types'
 
@@ -19,20 +19,41 @@ const isLocked = (subtask: Subtask, allSubtasks: Subtask[]): boolean => {
 export default function ExecutionPlan({ subtasks, onToggle, isDarkMode }: Props) {
   void isDarkMode
   const [poppingId, setPoppingId] = useState<number | null>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const checkScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    checkScroll()
+    el.addEventListener('scroll', checkScroll)
+    const ro = new ResizeObserver(checkScroll)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', checkScroll)
+      ro.disconnect()
+    }
+  }, [subtasks])
 
   useEffect(() => {
     const firstIncomplete = subtasks.findIndex(s => !s.done)
     if (firstIncomplete === -1) return
-
     const nodeWidth = 140
     const targetScroll = Math.max(0, (firstIncomplete - 1) * nodeWidth)
-
-    scrollRef.current?.scrollTo({
-      left: targetScroll,
-      behavior: 'smooth'
-    })
+    scrollRef.current?.scrollTo({ left: targetScroll, behavior: 'smooth' })
   }, [subtasks])
+
+  const scroll = (dir: 'left' | 'right') => {
+    scrollRef.current?.scrollBy({ left: dir === 'left' ? -280 : 280, behavior: 'smooth' })
+  }
 
   const handleClick = (subtask: Subtask, locked: boolean) => {
     if (locked) return
@@ -51,6 +72,12 @@ export default function ExecutionPlan({ subtasks, onToggle, isDarkMode }: Props)
 
   return (
     <div className="execution-plan-visual">
+      {canScrollLeft && (
+        <button className="exec-scroll-btn exec-scroll-left" onClick={() => scroll('left')}>
+          <ChevronLeft size={20} />
+        </button>
+      )}
+
       <div className="execution-nodes-scroll" ref={scrollRef}>
         <div className="execution-nodes">
           {subtasks.map((subtask, index) => {
@@ -94,6 +121,12 @@ export default function ExecutionPlan({ subtasks, onToggle, isDarkMode }: Props)
           })}
         </div>
       </div>
+
+      {canScrollRight && (
+        <button className="exec-scroll-btn exec-scroll-right" onClick={() => scroll('right')}>
+          <ChevronRight size={20} />
+        </button>
+      )}
     </div>
   )
 }

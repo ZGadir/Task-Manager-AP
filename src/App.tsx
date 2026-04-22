@@ -26,7 +26,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
-import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles, Lock, ChevronRight } from 'lucide-react'
+import { Plus, Moon, Sun, MoreHorizontal, Archive, Trash2, ArrowUp, Sparkles, Lock, ChevronRight, Settings } from 'lucide-react'
 import ExecutionPlan from './ExecutionPlan'
 import { Workspace, Subtask, AssistantMessage } from './types'
 import {
@@ -37,7 +37,8 @@ import {
   sendQuestioningMessage,
   sendPlanningMessage,
   sendExecutionMessage,
-  sendReviewMessage
+  sendReviewMessage,
+  generateBonusChallenges
 } from './aiService'
 import { extractDocumentText, truncateDocument } from './documentParser'
 
@@ -192,6 +193,7 @@ function DiamondIcon({ size = 16, color = 'currentColor' }: { size?: number, col
 }
 
 
+
 export default function App() {
   // ===============================
   // STATE: Workspaces + Selection
@@ -247,6 +249,10 @@ export default function App() {
     }
   })
   const [assistantInput, setAssistantInput] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('apiKey') || '')
+  const [apiProvider, setApiProvider] = useState(() => localStorage.getItem('apiProvider') || 'ollama')
+  const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem('selectedModel') || 'qwen2.5:7b')
   const [workspaceModes, setWorkspaceModes] = useState<Record<number, 'questioning' | 'planning' | 'execution' | 'review'>>({})
   const [planningStage, setPlanningStage] = useState<Record<number, 'summary' | 'generate'>>({})
 
@@ -268,6 +274,8 @@ export default function App() {
     })
   }
   const [isAILoading, setIsAILoading] = useState(false)
+  const [bonusChallenges, setBonusChallenges] = useState<Record<number, { title: string; reason: string; subtaskTitle: string }[]>>({})
+  const [loadingBonuses, setLoadingBonuses] = useState(false)
   const [planningTabPulse, setPlanningTabPulse] = useState(false)
   const [reviewTabPulse, setReviewTabPulse] = useState(false)
   const completionMessageSent = useRef<Record<number, boolean>>({})
@@ -292,6 +300,32 @@ export default function App() {
     return localStorage.getItem('darkMode') === 'true'
   })
   const [centerFading, setCenterFading] = useState(false)
+  const [centerLoading, setCenterLoading] = useState(false)
+  const [assistantWidth, setAssistantWidth] = useState(380)
+  const isResizing = useRef(false)
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    isResizing.current = true
+    const startX = e.clientX
+    const startWidth = assistantWidth
+
+    const onMouseMove = (ev: globalThis.MouseEvent) => {
+      if (!isResizing.current) return
+      const delta = startX - ev.clientX
+      const newWidth = Math.min(600, Math.max(280, startWidth + delta))
+      setAssistantWidth(newWidth)
+    }
+
+    const onMouseUp = () => {
+      isResizing.current = false
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
   const [completingId, setCompletingId] = useState<number | null>(null)
   const [visualMode, setVisualMode] = useState(true)
   const [assistantCollapsed, setAssistantCollapsed] = useState(false)
@@ -471,6 +505,7 @@ export default function App() {
           const allDone = updatedSubtasks.every(s => s.done)
           if (allDone && updatedSubtasks.length > 0 && !completionMessageSent.current[workspace.id]) {
             completionMessageSent.current[workspace.id] = true
+            setTimeout(() => setShowArchiveModal(true), 600)
             setReviewTabPulse(true)
             setChatHistories(prev => {
               const current = prev[workspace.id] || []
@@ -838,11 +873,13 @@ export default function App() {
   const handleSelectWorkspace = (workspaceId: number) => {
     if (workspaceId === selectedWorkspaceId) return
     setCenterFading(true)
+    setCenterLoading(true)
     setTimeout(() => {
       setSelectedWorkspaceId(workspaceId)
       setNewSubtaskTitle("")
       setCenterFading(false)
-    }, 150)
+      setTimeout(() => setCenterLoading(false), 800)
+    }, 200)
   };
 
   // ===============================
@@ -906,21 +943,12 @@ export default function App() {
             className="logo-img"
           />
           <div className="title">TaskQuest</div>
-
-          {/* NEW: Plus button opens Create modal */}
           <button
             className="icon-btn"
             title="New Task / Project"
             onClick={() => setIsCreateOpen(true)}
           >
             <Plus size={18} />
-          </button>
-          <button
-            className="icon-btn"
-            title="Toggle Dark Mode"
-            onClick={toggleDarkMode}
-          >
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
 
@@ -1016,6 +1044,18 @@ export default function App() {
 
         <div className="sidebar-footer">
           <div className="muted">Local Only Mode</div>
+          <div className="sidebar-footer-actions">
+            <button
+              className="icon-btn"
+              title="Toggle Dark Mode"
+              onClick={toggleDarkMode}
+            >
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button className="icon-btn" onClick={() => setShowSettings(true)}>
+              <Settings size={16} />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -1023,7 +1063,14 @@ export default function App() {
           MIDDLE PANEL (CENTER): Selected workspace view
           ======================================================= */}
 
-      <main className={`center center-panel ${centerFading ? 'fading' : ''}`}>
+      <main className={`center center-panel ${centerFading ? 'fading' : ''}`} style={{ position: 'relative' }}>
+        {centerLoading && (
+          <div className="center-loading-overlay">
+            <div className="center-loading-spinner">
+              <img src={isDarkMode ? '/logo-orange.svg' : '/logo-dark.svg'} alt="" />
+            </div>
+          </div>
+        )}
         {currentWorkspace ? (
           <>
             <div className="center-header">
@@ -1191,11 +1238,114 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Activity Log */}
-                <div className="activity-log">
-                  <h3>Activity Log</h3>
-                  <p className="activity-empty">Completed subtasks will appear here</p>
-                </div>
+                {currentWorkspace.subtasks.length > 0 && (
+                  <div className="next-step-section">
+                    <div className="next-step-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Bonus challenges</span>
+                      {!bonusChallenges[currentWorkspace.id] && (
+                        <button
+                          className="view-toggle-btn"
+                          onClick={async () => {
+                            if (!ollamaRunning) return
+                            setLoadingBonuses(true)
+                            try {
+                              const challenges = await generateBonusChallenges(
+                                currentWorkspace.title,
+                                currentWorkspace.description,
+                                currentWorkspace.subtasks.map(s => s.title)
+                              )
+                              setBonusChallenges(prev => ({ ...prev, [currentWorkspace.id]: challenges }))
+                            } catch {
+                              // fail silently
+                            } finally {
+                              setLoadingBonuses(false)
+                            }
+                          }}
+                          disabled={loadingBonuses}
+                        >
+                          {loadingBonuses ? 'Generating...' : 'Generate'}
+                        </button>
+                      )}
+                    </div>
+
+                    {!bonusChallenges[currentWorkspace.id] && !loadingBonuses && (
+                      <p className="next-step-text">
+                        Optional challenges to go further — click Generate to get AI suggestions tailored to your task.
+                      </p>
+                    )}
+
+                    {loadingBonuses && (
+                      <div className="next-step-text">Thinking of bonus challenges...</div>
+                    )}
+
+                    {bonusChallenges[currentWorkspace.id]?.map((challenge, i) => (
+                      <div key={i} className="next-step-card" style={{ marginBottom: '8px' }}>
+                        <div className="next-step-indicator" style={{ background: '#a855f7' }} />
+                        <div style={{ flex: 1 }}>
+                          <p className="next-step-title">{challenge.title}</p>
+                          <p className="next-step-pts">{challenge.reason}</p>
+                        </div>
+                        <button
+                          className="view-toggle-btn"
+                          style={{ flexShrink: 0, marginLeft: '8px' }}
+                          onClick={() => {
+                            const newSubtask = {
+                              id: Date.now(),
+                              title: challenge.subtaskTitle || challenge.title,
+                              done: false,
+                              points: 10,
+                              dependsOn: []
+                            }
+                            updateWorkspace(currentWorkspace.id, {
+                              subtasks: [...currentWorkspace.subtasks, newSubtask]
+                            })
+                            setBonusChallenges(prev => ({
+                              ...prev,
+                              [currentWorkspace.id]: prev[currentWorkspace.id].filter((_, idx) => idx !== i)
+                            }))
+                          }}
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    ))}
+
+                    {bonusChallenges[currentWorkspace.id]?.length === 0 && (
+                      <p className="next-step-text">All bonus challenges added to your plan.</p>
+                    )}
+
+                    {bonusChallenges[currentWorkspace.id] && (
+                      <button
+                        className="view-toggle-btn"
+                        style={{ marginTop: '8px' }}
+                        onClick={async () => {
+                          setLoadingBonuses(true)
+                          try {
+                            const challenges = await generateBonusChallenges(
+                              currentWorkspace.title,
+                              currentWorkspace.description,
+                              currentWorkspace.subtasks.map(s => s.title)
+                            )
+                            setBonusChallenges(prev => ({
+                              ...prev,
+                              [currentWorkspace.id]: [
+                                ...(prev[currentWorkspace.id] || []),
+                                ...challenges
+                              ]
+                            }))
+                          } catch {
+                            // fail silently
+                          } finally {
+                            setLoadingBonuses(false)
+                          }
+                        }}
+                        disabled={loadingBonuses}
+                      >
+                        {loadingBonuses ? 'Generating...' : 'Generate more'}
+                      </button>
+                    )}
+                  </div>
+                )}
 
               </div>
             </div>
@@ -1210,7 +1360,11 @@ export default function App() {
         )}
       </main>
 
-      <aside className={`assistant assistant-panel ${assistantCollapsed ? 'collapsed' : ''}`}>
+      <aside
+        className={`assistant assistant-panel ${assistantCollapsed ? 'collapsed' : ''} ${centerLoading ? 'assistant-loading' : ''}`}
+        style={assistantCollapsed ? undefined : { flex: `0 0 ${assistantWidth}px`, width: assistantWidth, minWidth: assistantWidth, maxWidth: assistantWidth }}
+      >
+        <div className="assistant-resize-handle" onMouseDown={handleResizeStart} />
         <button
           className="assistant-toggle-btn"
           onClick={() => setAssistantCollapsed(prev => !prev)}
@@ -1335,6 +1489,88 @@ export default function App() {
         </div>
 
       </aside>
+
+      {showSettings && (
+        <div className="modal-backdrop" onMouseDown={() => setShowSettings(false)}>
+          <div className="modal settings-modal" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Settings</h3>
+            </div>
+            <div className="modal-body">
+
+              <div className="settings-section">
+                <label className="settings-label">AI Provider</label>
+                <select
+                  className="settings-select"
+                  value={apiProvider}
+                  onChange={e => {
+                    setApiProvider(e.target.value)
+                    localStorage.setItem('apiProvider', e.target.value)
+                  }}
+                >
+                  <option value="ollama">Local (Ollama)</option>
+                  <option value="anthropic">Claude API (Anthropic)</option>
+                  <option value="openai">OpenAI API</option>
+                </select>
+              </div>
+
+              {apiProvider === 'ollama' && (
+                <div className="settings-section">
+                  <label className="settings-label">Local Model</label>
+                  <select
+                    className="settings-select"
+                    value={selectedModel}
+                    onChange={e => {
+                      setSelectedModel(e.target.value)
+                      localStorage.setItem('selectedModel', e.target.value)
+                    }}
+                  >
+                    <option value="qwen2.5:7b">qwen2.5:7b (recommended)</option>
+                    <option value="llama3.1:8b">llama3.1:8b</option>
+                    <option value="mistral:7b">mistral:7b</option>
+                    <option value="qwen2.5:14b">qwen2.5:14b (best quality)</option>
+                  </select>
+                </div>
+              )}
+
+              {(apiProvider === 'anthropic' || apiProvider === 'openai') && (
+                <div className="settings-section">
+                  <label className="settings-label">
+                    API Key
+                    <span className="settings-hint"> (stored locally, never sent anywhere)</span>
+                  </label>
+                  <input
+                    type="password"
+                    className="settings-input"
+                    placeholder={apiProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+                    value={apiKey}
+                    onChange={e => {
+                      setApiKey(e.target.value)
+                      localStorage.setItem('apiKey', e.target.value)
+                    }}
+                  />
+                </div>
+              )}
+
+              <div className="settings-section">
+                <label className="settings-label">AI Style</label>
+                <select className="settings-select" defaultValue="learning">
+                  <option value="learning">Learning (Socratic — default)</option>
+                  <option value="guided">Guided (balanced)</option>
+                  <option value="professional">Professional (direct)</option>
+                </select>
+                <p className="settings-hint">More styles coming soon</p>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn primary" onClick={() => setShowSettings(false)}>
+                  Save & Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ARCHIVE MODAL */}
       {showArchiveModal && (

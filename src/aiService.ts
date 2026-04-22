@@ -23,14 +23,54 @@ export async function checkOllamaRunning(): Promise<boolean> {
 }
 
 export async function sendToAI(messages: Message[], model: string = MODELS.planning): Promise<string> {
-  const response = await fetch(OLLAMA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, stream: false })
-  })
-  if (!response.ok) throw new Error('Failed to connect to Ollama')
-  const data = await response.json()
-  return data.message.content
+  const apiKey = localStorage.getItem('apiKey')
+  const apiProvider = localStorage.getItem('apiProvider') || 'ollama'
+
+  if (apiProvider === 'anthropic' && apiKey) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 1000,
+        system: messages.find(m => m.role === 'system')?.content || '',
+        messages: messages.filter(m => m.role !== 'system')
+      })
+    })
+    const data = await response.json()
+    return data.content[0].text
+
+  } else if (apiProvider === 'openai' && apiKey) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages,
+        max_tokens: 1000
+      })
+    })
+    const data = await response.json()
+    return data.choices[0].message.content
+
+  } else {
+    const localModel = localStorage.getItem('selectedModel') || model
+    const response = await fetch(OLLAMA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: localModel, messages, stream: false })
+    })
+    if (!response.ok) throw new Error('Failed to connect to Ollama')
+    const data = await response.json()
+    return data.message.content
+  }
 }
 
 // ===============================
@@ -145,14 +185,16 @@ This ensures correct dependency ordering.
 
 Rules for subtasks:
 - Generate 6 to 10 subtasks
-- Each subtask title must be specific and descriptive — not vague one-liners
-- Good: "Set up Express server with JWT authentication middleware and user model"
-- Bad: "Set up backend"
-- Do NOT include things already decided in questioning as separate subtasks
-- Do NOT write code or implementation instructions
+- Each subtask title must be a FULL descriptive sentence — not a short label
+- Include WHAT to do, WHY it matters, and HOW to approach it briefly
+- GOOD: "Set up Express server with JWT middleware — this forms the authentication backbone of the app and must be done before any protected routes are created"
+- BAD: "Set up backend"
+- BAD: "Implement authentication"
+- Do NOT include things already decided in questioning as their own subtasks
 - Think about ALL phases: research → setup → prerequisites → core build → integration → testing → polish
-- Assign points: easy=5, medium=10, hard=15, very_hard=20
-- Add a dependsOn field listing which subtask indices must be done first (empty array if none)
+- Assign points honestly: easy=5, medium=10, hard=15, very_hard=20
+- Add dependsOn field with indices of subtasks that must be completed first
+- Order subtasks so each one builds naturally on the previous
 
 Respond in this EXACT JSON format with no other text:
 {
@@ -362,5 +404,48 @@ Respond in this exact JSON format only:
     return { title: parsed.title || '', description: parsed.description || '' }
   } catch {
     return { title: '', description: description }
+  }
+}
+
+export async function generateBonusChallenges(
+  taskTitle: string,
+  taskDescription: string,
+  completedSubtasks: string[]
+): Promise<{ title: string; reason: string; subtaskTitle: string }[]> {
+  const systemPrompt = `You are TaskQuest AI. Generate 3 optional bonus challenges for a user who has completed or is working on a task.
+
+These challenges should:
+- Be directly related to the specific task and subtasks
+- Go one step further than what was required
+- Be genuinely useful and interesting, not generic
+- Inspire the user to learn more or improve their work
+- NOT repeat anything already in the subtasks
+
+Task: ${taskTitle}
+Description: ${taskDescription}
+Current subtasks: ${completedSubtasks.join(', ')}
+
+Respond in this EXACT JSON format only, no other text:
+{
+  "challenges": [
+    {
+      "title": "Specific challenge title",
+      "reason": "One sentence why this is worth doing",
+      "subtaskTitle": "Full descriptive subtask sentence explaining WHAT needs to be done and why it matters — not how to do it"
+    }
+  ]
+}`
+
+  const response = await sendToAI([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: 'Generate bonus challenges.' }
+  ], MODELS.planning)
+
+  try {
+    const cleaned = response.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(cleaned)
+    return parsed.challenges || []
+  } catch {
+    return []
   }
 }
