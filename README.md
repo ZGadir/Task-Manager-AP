@@ -10,7 +10,7 @@ An AI-powered desktop task management app that helps users break down tasks into
 
 ## Installation
 
-1. Download `TaskQuest-Setup.exe` from the releases section
+1. Download `TaskQuest-Setup.exe` from the [releases page](https://github.com/ZGadir/Task-Manager-AP/releases/tag/v1.0.0)
 2. Run the installer and follow the steps
 3. Install Ollama from https://ollama.ai
 4. Open terminal and run:
