@@ -554,8 +554,36 @@ html, body, #root {
 
 .assistant-header {
   background: white;
-  padding: 14px;
+  padding: 14px 14px 12px;
   border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.clear-chat-btn {
+  display: block;
+  margin-left: auto;
+  margin-right: 14px;
+  margin-bottom: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #94a3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.clear-chat-btn:hover:not(:disabled) {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.clear-chat-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 .assistant-title {
@@ -573,6 +601,7 @@ html, body, #root {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
+  width: 100%;
 }
 
 .mode {
@@ -920,6 +949,165 @@ html, body, #root {
 }
 
 /* =========================
+   CENTER EMPTY STATE
+   ========================= */
+
+.empty-center-heading {
+  padding: 28px 32px 0;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.empty-center-heading h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 6px;
+}
+
+.dark .empty-center-heading h2 {
+  color: #f1f5f9;
+}
+
+.empty-center-heading p {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+@keyframes nodeBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+
+.ghost-node.bouncing {
+  animation: nodeBounce 1.6s ease-in-out infinite;
+}
+
+.empty-center-layout {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.ghost-line {
+  display: inline-block;
+  background: #cbd5e1;
+  border-radius: 4px;
+  height: 12px;
+  width: 100%;
+}
+
+.dark .ghost-line {
+  background: #334155;
+}
+
+.empty-ghost-nodes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+}
+
+.ghost-node {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.dark .ghost-node {
+  background: #334155;
+}
+
+.ghost-arrow {
+  flex: 1;
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 1px;
+  max-width: 60px;
+}
+
+.dark .ghost-arrow {
+  background: #334155;
+}
+
+.ghost-subtask-row {
+  height: 48px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.dark .ghost-subtask-row {
+  background: #1e293b;
+}
+
+.empty-center-cta {
+  text-align: center;
+  padding: 16px;
+  pointer-events: all;
+  opacity: 1;
+}
+
+.empty-center-cta p {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.empty-center-cta strong {
+  color: #f97316;
+}
+
+/* =========================
+   ASSISTANT WELCOME STATE
+   ========================= */
+
+.assistant-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 20px;
+  gap: 8px;
+}
+
+.assistant-welcome-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f97316;
+  color: white;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.assistant-welcome-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.dark .assistant-welcome-title {
+  color: #f1f5f9;
+}
+
+.assistant-welcome-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* =========================
    LEFT PANEL EMPTY STATE
    ========================= */
 
@@ -928,6 +1116,53 @@ html, body, #root {
   font-size: 13px;
   color: #94a3b8;
   text-align: center;
+}
+
+.empty-left p {
+  margin: 4px 0;
+}
+
+.empty-left strong {
+  color: #f97316;
+}
+
+@keyframes ghostPulse {
+  0%, 100% { opacity: var(--ghost-opacity, 0.5); }
+  50%       { opacity: calc(var(--ghost-opacity, 0.5) * 0.55); }
+}
+
+.ghost-workspace-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.ghost-workspace-card {
+  animation: ghostPulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ghost-ws-tag {
+  height: 9px;
+  width: 36px;
+  border-radius: 3px;
+  background: #334155;
+  margin-bottom: 8px;
+}
+
+.ghost-ws-title {
+  height: 11px;
+  width: 85%;
+  border-radius: 4px;
+  background: #cbd5e1;
+  margin-bottom: 10px;
+}
+
+.dark .ghost-ws-title {
+  background: #334155;
 }
 
 /* Execution Plan Styles */

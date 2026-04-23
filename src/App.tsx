@@ -199,38 +199,19 @@ export default function App() {
   // STATE: Workspaces + Selection
   // ===============================
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
+    const DATA_VERSION = '2'
+    if (localStorage.getItem('dataVersion') !== DATA_VERSION) {
+      localStorage.removeItem('workspaces')
+      localStorage.removeItem('archivedWorkspaces')
+      localStorage.removeItem('chatHistories')
+      localStorage.setItem('dataVersion', DATA_VERSION)
+      return []
+    }
     const saved = localStorage.getItem('workspaces')
     if (saved) return JSON.parse(saved)
-    return [
-      {
-        id: 1,
-        type: 'task',
-        title: 'Prepare Quarterly Report',
-        description: 'Summarize financial performance and team KPIs.',
-        subtasks: [
-          { id: 1, title: 'Gather Q4 data', done: false, points: 100 },
-          { id: 2, title: 'Create charts', done: false, points: 150 },
-          { id: 3, title: 'Write executive summary', done: false, points: 200 },
-        ],
-        points: 0,
-        progress: 0,
-      },
-      {
-        id: 2,
-        type: 'project',
-        title: 'Redesign Q1 Landing Page',
-        description: 'Update hero section + CTA buttons for better conversion.',
-        subtasks: [
-          { id: 1, title: 'Analyze current conversion metrics', done: false, points: 100 },
-          { id: 2, title: 'Create wireframes for new hero section', done: false, points: 150 },
-          { id: 3, title: 'Design CTA button variations', done: false, points: 100 },
-        ],
-        points: 0,
-        progress: 0,
-      },
-    ]
+    return []
   })
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(1)
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number>(0)
   // ===============================
   // STATE: Create Task/Project Modal
   // ===============================
@@ -914,9 +895,6 @@ export default function App() {
   }
 
   // ===============================
-  // FUTURE: place new logic here later
-  // - Rename workspace
-  // - Delete workspace
   // - Add subtasks + points system
   // - Save/load from disk (Electron FS)
   // ===============================
@@ -980,7 +958,50 @@ export default function App() {
 
         <div className="workspace-list">
           {workspaces.length === 0 && (
-            <div className="empty-left">No tasks yet</div>
+            <div className="empty-left">
+              <p>No tasks yet.</p>
+              <p>Press <strong>+</strong> to get started.</p>
+              <div className="ghost-workspace-list">
+                {/* Ghost card 1 — TASK */}
+                <div className="workspace-item task ghost-workspace-card" style={{opacity: 0.6, animationDelay: '0s', cursor:'default'}}>
+                  <div className="workspace-header">
+                    <span className="workspace-type">TASK</span>
+                  </div>
+                  <div className="ghost-ws-title" style={{width:'78%'}} />
+                  <div className="workspace-stats" style={{marginTop:8}}>
+                    <div className="ghost-ws-title" style={{width:48, height:10, marginBottom:0}} />
+                    <div className="ghost-ws-title" style={{width:24, height:10, marginBottom:0}} />
+                  </div>
+                  <div className="workspace-progress-bar"><div className="workspace-progress-fill" style={{width:'0%'}} /></div>
+                </div>
+
+                {/* Ghost card 2 — PROJECT */}
+                <div className="workspace-item project ghost-workspace-card" style={{opacity: 0.35, animationDelay: '0.2s', cursor:'default'}}>
+                  <div className="workspace-header">
+                    <span className="workspace-type">PROJECT</span>
+                  </div>
+                  <div className="ghost-ws-title" style={{width:'62%'}} />
+                  <div className="workspace-stats" style={{marginTop:8}}>
+                    <div className="ghost-ws-title" style={{width:48, height:10, marginBottom:0}} />
+                    <div className="ghost-ws-title" style={{width:24, height:10, marginBottom:0}} />
+                  </div>
+                  <div className="workspace-progress-bar"><div className="workspace-progress-fill" style={{width:'0%'}} /></div>
+                </div>
+
+                {/* Ghost card 3 — TASK */}
+                <div className="workspace-item task ghost-workspace-card" style={{opacity: 0.15, animationDelay: '0.4s', cursor:'default'}}>
+                  <div className="workspace-header">
+                    <span className="workspace-type">TASK</span>
+                  </div>
+                  <div className="ghost-ws-title" style={{width:'85%'}} />
+                  <div className="workspace-stats" style={{marginTop:8}}>
+                    <div className="ghost-ws-title" style={{width:48, height:10, marginBottom:0}} />
+                    <div className="ghost-ws-title" style={{width:24, height:10, marginBottom:0}} />
+                  </div>
+                  <div className="workspace-progress-bar"><div className="workspace-progress-fill" style={{width:'0%'}} /></div>
+                </div>
+              </div>
+            </div>
           )}
           <DndContext
             sensors={sensors}
@@ -1369,12 +1390,54 @@ export default function App() {
               </div>
             </div>
 
-            {/* FUTURE: Put subtasks UI + log timeline here */}
-
-          </>
+</>
         ) : (
-          <div className="section">
-            <div className="empty-card">Select a workspace from the left.</div>
+          <div className="empty-center-layout">
+            <div className="empty-center-heading">
+              <h2>Your workspace is ready</h2>
+              <p>Create a task or project and start building your execution plan.</p>
+            </div>
+            <div className="center-header">
+              <div className="crumbs"><span className="ghost-line" style={{width:80}} /></div>
+              <div className="ghost-line" style={{width:'55%', height:32, marginTop:10, marginBottom:10, borderRadius:6}} />
+              <div className="ghost-line" style={{width:'80%', height:13, marginBottom:4}} />
+              <div className="ghost-line" style={{width:'60%', height:13}} />
+              <div className="header-divider" />
+              <div className="ghost-line" style={{width:110, height:28, borderRadius:20}} />
+              <div className="progress-row" style={{marginTop:16}}>
+                <span className="progress-label"><span className="ghost-line" style={{width:55, height:11}} /></span>
+                <span className="progress-percent"><span className="ghost-line" style={{width:28, height:11}} /></span>
+              </div>
+              <div className="progress-track"><div className="progress-fill" style={{width:'0%'}} /></div>
+            </div>
+
+            <div className="execution-plan">
+              <div className="execution-card">
+                <div className="execution-header">
+                  <span className="execution-title">Execution Plan</span>
+                  <div className="ghost-line" style={{width:72, height:26, borderRadius:6}} />
+                </div>
+                <div className="execution-divider" />
+                <div className="empty-ghost-nodes">
+                  <div className="ghost-node bouncing" style={{animationDelay:'0s'}} /><div className="ghost-arrow" />
+                  <div className="ghost-node bouncing" style={{animationDelay:'0.15s'}} /><div className="ghost-arrow" />
+                  <div className="ghost-node bouncing" style={{animationDelay:'0.3s'}} /><div className="ghost-arrow" />
+                  <div className="ghost-node bouncing" style={{animationDelay:'0.45s'}} />
+                </div>
+              </div>
+            </div>
+
+            <div className="execution-plan" style={{marginTop:0}}>
+              <div className="execution-card">
+                <div className="ghost-subtask-row" />
+                <div className="ghost-subtask-row" style={{width:'75%'}} />
+                <div className="ghost-subtask-row" />
+              </div>
+            </div>
+
+            <div className="empty-center-cta">
+              <p>No task selected — press <strong>+</strong> to create one</p>
+            </div>
           </div>
         )}
       </main>
@@ -1394,7 +1457,7 @@ export default function App() {
         <div className="assistant-content">
         <div className="assistant-header">
           <div className="assistant-title">Task Assistant</div>
-          <div className="modes">
+          <div className="modes" style={{marginTop: 10}}>
             <span
               className={`mode ${assistantMode === 'questioning' ? 'active' : ''}`}
               onClick={() => handleModeSwitch('questioning')}
@@ -1433,6 +1496,13 @@ export default function App() {
         )}
 
         <div className="assistant-body" ref={assistantBodyRef}>
+          {!currentWorkspace && assistantMessages.length === 0 && (
+            <div className="assistant-welcome">
+              <div className="assistant-welcome-icon">TQ</div>
+              <p className="assistant-welcome-title">TaskQuest Assistant</p>
+              <p className="assistant-welcome-sub">Create a task or project and I'll help you plan, execute and review it step by step.</p>
+            </div>
+          )}
           {assistantMessages.map((msg, index) => (
             <div
               key={index}
@@ -1473,6 +1543,14 @@ export default function App() {
           </label>
         </div>
 
+        <button
+          className="clear-chat-btn"
+          onClick={() => setAssistantMessages([])}
+          title="Clear chat"
+          disabled={assistantMessages.length === 0}
+        >
+          Clear chat
+        </button>
         <div className="assistant-input">
           <textarea
             placeholder={ollamaRunning ? "Describe your task..." : "Start Ollama to use AI..."}
@@ -1724,7 +1802,6 @@ export default function App() {
               </div>
             </form>
 
-            {/* FUTURE: Add file upload into modal here (optional) */}
 
 
           </div>
