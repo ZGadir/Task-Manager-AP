@@ -1,103 +1,66 @@
-Task & Project Manager – Prototype
-Final Year Project (IPD Milestone 1)
+# TaskQuest
 
-Student: Gadir Zamanbayov
-Module: 6COSC023W – Final Year Project
+An AI-powered desktop task management app that helps users break down tasks into subtasks using a Socratic AI mentor, track progress through gamification, and reflect on completed work.
 
-Project Overview
-This project is a desktop task and project management application designed to help users stay focused, break down complex tasks, and track progress over time.
+## Requirements
 
-Instead of treating tasks as simple checkboxes, each task or project acts as a persistent workspace. The system is designed to later integrate an AI assistant that asks questions, breaks tasks into subtasks, and supports the user throughout completion.
+- Windows 10 or later
+- [Ollama](https://ollama.ai) installed and running locally
+- At least 8GB RAM recommended
 
-This repository contains the working prototype and initial implementation for IPD Milestone 1.
+## Installation
 
-Current Prototype Features
+1. Download `TaskQuest-Setup.exe` from the releases section
+2. Run the installer and follow the steps
+3. Install Ollama from https://ollama.ai
+4. Open terminal and run:
+```
+ollama pull qwen2.5:7b
+ollama pull llama3.1:8b
+```
+5. Start Ollama:
+```
+ollama serve
+```
+6. Launch TaskQuest from your desktop
 
-Desktop application built with Electron
+## Running from source
 
-Task and project creation
+If you prefer to run from source:
 
-Left-side workspace list
-
-Central task workspace view
-
-Progress tracking per task
-
-Gamification foundations (points and progress)
-
-Responsive UI layout
-
-Not implemented yet (planned for later milestones):
-
-AI assistant logic
-
-Calendar integration
-
-Design Principles
-
-Minimal friction when creating tasks
-
-Tasks are treated as workspaces, not one-click completions
-
-Offline-first desktop application
-
-Subtle gamification to improve motivation
-
-AI-driven workflow planned for future development
-
-Technology Stack
-
-Electron (desktop application framework)
-
-React with TypeScript (UI and logic)
-
-Vite (build tooling)
-
-Custom CSS (layout and styling)
-
-Project Structure (Key Files)
-
-src/App.tsx – Main UI and layout logic
-
-src/App.css – Application styling
-
-electron/main.ts – Electron main process
-
-electron/preload.ts – Secure preload bridge
-
-Build outputs are intentionally ignored from version control.
-
-Running the Prototype
+1. Clone the repository
+2. Install dependencies:
+```
 npm install
+```
+3. Install and start Ollama (see above)
+4. Run the app:
+```
 npm run dev
+```
 
-Future Work
+## Usage
 
-AI assistant integration for task breakdown
+1. Click **+** to create a new task or project
+2. Describe your task — the AI will ask clarifying questions
+3. Switch to **Planning** tab — AI generates a structured subtask plan
+4. Work through subtasks in **Execution** tab with AI guidance
+5. Reflect on your work in **Review** tab
+6. Earn points by completing subtasks
 
-Task-scoped AI memory
+## AI Models Used
 
-File-based context analysis (PDFs, code files)
+- `llama3.1:8b` — questioning, review, and greeting phases
+- `qwen2.5:7b` — planning and execution phases
 
-Calendar-aware project scheduling
+## Optional: Use your own API key
 
-First-time user tutorial
+Open Settings (gear icon in sidebar) to switch from local Ollama to Claude or OpenAI API for better AI quality.
 
-Persistent user data and settings
+## Repository
 
-Submission Context
-This repository is submitted as part of:
+[GitHub Repository Link]
 
-Prototype code (GitHub link)
+## Video Demo
 
-Video demonstration (5–10 minutes)
-
-Video presentation (20 minutes)
-
-If you want, I can also:
-
-tighten this to match marking criteria wording
-
-write the Blackboard submission text
-
-or sanity-check everything before final upload
+https://youtu.be/8jIJgWFBY2M
