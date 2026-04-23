@@ -59,7 +59,7 @@ Open Settings (gear icon in sidebar) to switch from local Ollama to Claude or Op
 
 ## Repository
 
-[GitHub Repository Link]
+https://github.com/ZGadir/Task-Manager-AP
 
 ## Video Demo
 
